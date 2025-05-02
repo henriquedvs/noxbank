@@ -14,6 +14,9 @@ import Cards from "./pages/Cards";
 import Finance from "./pages/Finance";
 import Settings from "./pages/Settings";
 import Transfer from "./pages/Transfer";
+import Deposit from "./pages/Deposit";
+import Pix from "./pages/Pix";
+import Payment from "./pages/Payment";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +35,9 @@ const App = () => (
           <Route path="/finance" element={<Finance />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/transfer" element={<Transfer />} />
+          <Route path="/deposit" element={<Deposit />} />
+          <Route path="/pix" element={<Pix />} />
+          <Route path="/payment" element={<Payment />} />
           <Route path="/index" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

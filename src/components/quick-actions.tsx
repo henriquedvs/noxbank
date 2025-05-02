@@ -36,17 +36,17 @@ const QuickActions = () => {
     { 
       icon: Banknote, 
       label: 'Pagar',
-      onClick: () => console.log('Pagar clicked')
+      onClick: () => navigate('/payment')
     },
     { 
       icon: CreditCard, 
       label: 'Depositar',
-      onClick: () => console.log('Depositar clicked')
+      onClick: () => navigate('/deposit')
     },
     { 
       icon: QrCode, 
       label: 'Pix',
-      onClick: () => console.log('Pix clicked')
+      onClick: () => navigate('/pix')
     },
   ];
 
