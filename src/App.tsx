@@ -13,6 +13,7 @@ import Home from "./pages/Home";
 import Cards from "./pages/Cards";
 import Finance from "./pages/Finance";
 import Settings from "./pages/Settings";
+import Transfer from "./pages/Transfer";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/cards" element={<Cards />} />
           <Route path="/finance" element={<Finance />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/transfer" element={<Transfer />} />
           <Route path="/index" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

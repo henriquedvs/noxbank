@@ -1,5 +1,6 @@
 
 import { ArrowUpRight, Banknote, CreditCard, QrCode } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const QuickAction = ({ 
   icon: Icon, 
@@ -24,20 +25,39 @@ const QuickAction = ({
 };
 
 const QuickActions = () => {
+  const navigate = useNavigate();
+  
   const actions = [
-    { icon: ArrowUpRight, label: 'Transferir' },
-    { icon: Banknote, label: 'Pagar' },
-    { icon: CreditCard, label: 'Depositar' },
-    { icon: QrCode, label: 'Pix' },
+    { 
+      icon: ArrowUpRight, 
+      label: 'Transferir',
+      onClick: () => navigate('/transfer')
+    },
+    { 
+      icon: Banknote, 
+      label: 'Pagar',
+      onClick: () => console.log('Pagar clicked')
+    },
+    { 
+      icon: CreditCard, 
+      label: 'Depositar',
+      onClick: () => console.log('Depositar clicked')
+    },
+    { 
+      icon: QrCode, 
+      label: 'Pix',
+      onClick: () => console.log('Pix clicked')
+    },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-3 px-1 py-5">
+    <div className="grid grid-cols-4 gap-3 px-5 py-5">
       {actions.map((action, index) => (
         <QuickAction
           key={index}
           icon={action.icon}
           label={action.label}
+          onClick={action.onClick}
         />
       ))}
     </div>
