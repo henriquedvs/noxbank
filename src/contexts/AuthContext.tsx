@@ -140,6 +140,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, username: string, fullName: string) => {
     setLoading(true);
     try {
+      // Verificação do formato do username
+      if (!username.startsWith('@')) {
+        username = '@' + username;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -152,12 +157,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) {
+        console.error('Erro ao criar conta:', error);
+        let errorMessage = error.message;
+        
+        // Mensagens de erro mais amigáveis
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'Este e-mail já está cadastrado. Tente fazer login.';
+        } else if (error.message.includes('Password')) {
+          errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
+        }
+        
         toast({
           title: 'Erro ao criar conta',
-          description: error.message,
+          description: errorMessage,
           variant: 'destructive',
         });
         throw error;
+      }
+
+      // Adicionar uma espera para garantir que o perfil foi criado
+      if (data.user) {
+        // Esperar 1 segundo para garantir que o trigger foi executado
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await fetchProfile(data.user.id);
       }
 
       toast({
@@ -166,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       navigate('/home');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in signUp:', error);
     } finally {
       setLoading(false);

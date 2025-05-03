@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Logo from '@/components/logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 
 type StepKey = 'personal' | 'address' | 'income' | 'password';
 
@@ -96,18 +97,34 @@ const Signup = () => {
   };
 
   const nextStep = () => {
+    setError(null); // Limpa erros anteriores
+    
     if (currentStep === 'personal') {
       // Validate username
       if (!validateUsername(formData.username)) {
         setError('Nome de usuário inválido. Use apenas letras, números, _ ou .');
         return;
       }
+      
+      // Validar email
+      if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+        setError('E-mail inválido.');
+        return;
+      }
+      
+      // Validar CPF (formato básico)
+      if (formData.cpf.length < 11) {
+        setError('CPF inválido.');
+        return;
+      }
+      
       setCurrentStep('address');
     } else if (currentStep === 'address') setCurrentStep('income');
     else if (currentStep === 'income') setCurrentStep('password');
   };
 
   const prevStep = () => {
+    setError(null); // Limpa erros anteriores
     if (currentStep === 'password') setCurrentStep('income');
     else if (currentStep === 'income') setCurrentStep('address');
     else if (currentStep === 'address') setCurrentStep('personal');
@@ -131,6 +148,11 @@ const Signup = () => {
       return;
     }
     
+    if (formData.password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -138,7 +160,17 @@ const Signup = () => {
       const formattedUsername = formatUsername(formData.username);
       await signUp(formData.email, formData.password, formattedUsername, formData.name);
     } catch (error: any) {
-      setError(error.message || 'Erro ao criar conta');
+      console.error('Erro ao criar conta:', error);
+      
+      // Mostrar toast mesmo quando o erro já foi tratado no context
+      if (!error.message) {
+        toast({
+          title: 'Erro ao criar conta',
+          description: 'Verifique as informações e tente novamente.',
+          variant: 'destructive',
+        });
+      }
+      
       setIsLoading(false);
     }
   };
