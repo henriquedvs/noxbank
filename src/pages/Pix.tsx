@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/bottom-nav";
-import { Tab, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

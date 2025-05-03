@@ -70,9 +70,12 @@ const Home = () => {
           const isSender = t.sender_id === profile.id;
           const isDeposit = t.sender_id === t.receiver_id;
           
+          // Explicitly cast type as 'income' or 'expense' to satisfy TypeScript
+          const transactionType: 'income' | 'expense' = isSender && !isDeposit ? 'expense' : 'income';
+          
           return {
             id: t.id,
-            type: isSender && !isDeposit ? 'expense' : 'income',
+            type: transactionType,
             title: isDeposit ? 'Depósito' : (isSender ? `Para ${t.profiles?.username || 'Desconhecido'}` : `De ${t.profiles?.username || 'Desconhecido'}`),
             category: t.transaction_type.charAt(0).toUpperCase() + t.transaction_type.slice(1),
             amount: Number(t.amount),
