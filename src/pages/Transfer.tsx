@@ -31,6 +31,7 @@ const Transfer = () => {
   const [description, setDescription] = useState("");
   const [isNewTransfer, setIsNewTransfer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [allUsers, setAllUsers] = useState<Contact[]>([]);
   const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
   const [newContactData, setNewContactData] = useState({
@@ -92,12 +93,34 @@ const Transfer = () => {
     fetchUsers();
   }, [user]);
 
+  // Melhorando a busca para ser mais responsiva
+  useEffect(() => {
+    if (searchTerm && searchTerm.length >= 2) {
+      const delaySearch = setTimeout(() => {
+        const filtered = allUsers.filter(contact => 
+          contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setAllUsers(prevUsers => {
+          // Ordenando para mostrar primeiro resultados mais relevantes
+          return [...prevUsers].sort((a, b) => {
+            const aMatch = a.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
+            const bMatch = b.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
+            return bMatch - aMatch;
+          });
+        });
+      }, 300);
+      
+      return () => clearTimeout(delaySearch);
+    }
+  }, [searchTerm]);
+
   const filteredContacts = recentContacts.filter(contact => 
     contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredAllUsers = searchTerm 
+  const filteredAllUsers = searchTerm && searchTerm.length >= 2
     ? allUsers.filter(contact => 
         contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -119,17 +142,21 @@ const Transfer = () => {
       return;
     }
 
+    setIsSearching(true);
+    
     try {
-      const username = newContactData.username.startsWith('@') 
-        ? newContactData.username.substring(1) 
-        : newContactData.username;
+      // Formatando o username corretamente para busca
+      let searchUsername = newContactData.username;
+      if (searchUsername.startsWith('@')) {
+        searchUsername = searchUsername.substring(1);
+      }
         
       // Search for the user in Supabase
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('username', `%${username}%`)
-        .limit(1);
+        .ilike('username', `%${searchUsername}%`)
+        .limit(10);
 
       if (error) {
         console.error('Error searching for user:', error);
@@ -150,7 +177,10 @@ const Transfer = () => {
         return;
       }
 
-      if (data[0].id === user?.id) {
+      // Verificar se algum dos usuários encontrados é o próprio usuário
+      const filteredData = data.filter(u => u.id !== user?.id);
+      
+      if (filteredData.length === 0) {
         toast({
           title: "Erro",
           description: "Você não pode transferir para sua própria conta",
@@ -159,7 +189,9 @@ const Transfer = () => {
         return;
       }
 
-      setSelectedContact(data[0]);
+      // Selecionando o usuário mais relevante (correspondência exata primeiro)
+      const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchUsername.toLowerCase());
+      setSelectedContact(exactMatch || filteredData[0]);
       setIsNewTransfer(false);
       setStep("amount");
     } catch (error) {
@@ -169,6 +201,8 @@ const Transfer = () => {
         description: "Ocorreu um erro ao buscar o usuário",
         variant: "destructive",
       });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -457,8 +491,13 @@ const Transfer = () => {
                     <Button
                       className="ml-2 bg-nox-primary"
                       onClick={handleSearchUser}
+                      disabled={isSearching}
                     >
-                      <Search className="h-4 w-4" />
+                      {isSearching ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
