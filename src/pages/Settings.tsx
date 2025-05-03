@@ -4,6 +4,7 @@ import {
   User, Lock, BellDot, CreditCard, HelpCircle, LogOut, 
   ChevronRight, Wallet, Shield, Languages, Smartphone
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SettingItem = ({ 
   icon: Icon, 
@@ -36,6 +37,23 @@ const SettingItem = ({
 };
 
 const Settings = () => {
+  const { signOut, profile } = useAuth();
+
+  const handleLogout = () => {
+    signOut();
+  };
+
+  // Get the user's initials for the avatar
+  const getInitials = () => {
+    if (!profile || !profile.full_name) return '';
+    
+    const names = profile.full_name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return names[0].substring(0, 2).toUpperCase();
+  };
+
   return (
     <div className="min-h-screen bg-nox-background pb-20">
       {/* Header */}
@@ -47,11 +65,11 @@ const Settings = () => {
       <div className="px-5 mb-6">
         <div className="bg-nox-card rounded-xl p-5 flex items-center">
           <div className="h-16 w-16 rounded-full bg-nox-primary/20 flex items-center justify-center mr-4 text-2xl font-bold text-nox-primary">
-            JS
+            {getInitials()}
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">João Silva</h3>
-            <p className="text-nox-textSecondary">joao.silva@email.com</p>
+            <h3 className="text-lg font-semibold text-white">{profile?.full_name || 'Carregando...'}</h3>
+            <p className="text-nox-textSecondary">{profile?.username || 'Carregando...'}</p>
           </div>
         </div>
       </div>
@@ -94,7 +112,10 @@ const Settings = () => {
         </div>
         
         {/* Logout */}
-        <button className="w-full bg-nox-card rounded-xl p-4 flex items-center justify-center text-rose-500 font-medium">
+        <button 
+          onClick={handleLogout}
+          className="w-full bg-nox-card rounded-xl p-4 flex items-center justify-center text-rose-500 font-medium"
+        >
           <LogOut className="h-5 w-5 mr-2" />
           Sair da conta
         </button>

@@ -17,6 +17,9 @@ import Transfer from "./pages/Transfer";
 import Deposit from "./pages/Deposit";
 import Pix from "./pages/Pix";
 import Payment from "./pages/Payment";
+import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationsProvider } from "./contexts/NotificationsContext";
+import ProtectedRoute from "./components/protected-route";
 
 const queryClient = new QueryClient();
 
@@ -26,21 +29,28 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<SplashScreen />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/cards" element={<Cards />} />
-          <Route path="/finance" element={<Finance />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/transfer" element={<Transfer />} />
-          <Route path="/deposit" element={<Deposit />} />
-          <Route path="/pix" element={<Pix />} />
-          <Route path="/payment" element={<Payment />} />
-          <Route path="/index" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <NotificationsProvider>
+            <Routes>
+              <Route path="/" element={<SplashScreen />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              
+              {/* Protected routes */}
+              <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/cards" element={<ProtectedRoute><Cards /></ProtectedRoute>} />
+              <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
+              <Route path="/deposit" element={<ProtectedRoute><Deposit /></ProtectedRoute>} />
+              <Route path="/pix" element={<ProtectedRoute><Pix /></ProtectedRoute>} />
+              <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
+              
+              <Route path="/index" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </NotificationsProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

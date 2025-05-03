@@ -1,250 +1,454 @@
 
 import { useState } from "react";
-import { QrCode, Copy, Key, Clock, Receipt, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/bottom-nav";
+import { Tab, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-
-const PixOption = ({ 
-  icon: Icon, 
-  title, 
-  description,
-  onClick 
-}: { 
-  icon: React.ElementType; 
-  title: string;
-  description: string;
-  onClick?: () => void;
-}) => {
-  return (
-    <button 
-      onClick={onClick}
-      className="w-full flex items-center p-4 bg-nox-card rounded-xl border border-zinc-800 hover:border-nox-primary/50 transition-all"
-    >
-      <div className="h-12 w-12 rounded-full bg-gradient-to-br from-nox-primary/20 to-nox-primary/10 flex items-center justify-center mr-4">
-        <Icon className="h-6 w-6 text-nox-primary" />
-      </div>
-      <div className="text-left">
-        <h3 className="text-white font-medium">{title}</h3>
-        <p className="text-sm text-nox-textSecondary">{description}</p>
-      </div>
-    </button>
-  );
-};
+import { supabase } from "@/integrations/supabase/client";
 
 const Pix = () => {
-  const [activeTab, setActiveTab] = useState<'send' | 'receive' | 'keys' | 'scheduled' | 'history'>('send');
-  
-  const pixKeys = [
-    { type: 'CPF', value: '123.456.789-00', registered: true },
-    { type: 'Email', value: 'joao.silva@email.com', registered: true },
-    { type: 'Telefone', value: '+55 (11) 98765-4321', registered: false },
-    { type: 'Aleatória', value: '28c7e8b9-9a87-4b43-a0cf-5c5e73c8b2d1', registered: true }
-  ];
-  
+  const navigate = useNavigate();
+  const { user, profile, refreshProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState<"receive" | "send">("receive");
+  const [amount, setAmount] = useState("");
+  const [pixKey, setPixKey] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [step, setStep] = useState<"key" | "amount" | "confirm" | "success">("key");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Format as currency
+    const value = e.target.value.replace(/\D/g, "");
+    const formattedValue = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+    }).format(parseFloat(value) / 100 || 0);
+    
+    setAmount(formattedValue);
+  };
+
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado!",
-      description: "A chave Pix foi copiada para a área de transferência."
-    });
+    navigator.clipboard.writeText(text).then(
+      () => {
+        toast({
+          title: "Copiado!",
+          description: "Informação copiada para a área de transferência.",
+        });
+      },
+      (err) => {
+        toast({
+          title: "Erro ao copiar",
+          description: "Não foi possível copiar o texto.",
+          variant: "destructive",
+        });
+      }
+    );
   };
-  
-  const openTransferPage = () => {
-    // In a real app, this would navigate to the transfer page
-    console.log("Navigate to transfer page");
+
+  const handlePixKeySearch = async () => {
+    if (!pixKey) {
+      toast({
+        title: "Chave inválida",
+        description: "Por favor, insira uma chave Pix válida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      // In this prototype, we'll use the username as Pix key
+      // Remove @ from beginning if present
+      const searchKey = pixKey.startsWith('@') ? pixKey.substring(1) : pixKey;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', searchKey)
+        .limit(1);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        toast({
+          title: "Usuário não encontrado",
+          description: "Nenhum usuário encontrado com esta chave Pix",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data[0].id === user?.id) {
+        toast({
+          title: "Operação inválida",
+          description: "Você não pode enviar um Pix para si mesmo",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSelectedUser(data[0]);
+      setStep("amount");
+    } catch (error) {
+      console.error('Error searching for Pix key:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao buscar a chave Pix",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
-  
-  return (
-    <div className="min-h-screen bg-nox-background pb-20">
-      {/* Header */}
-      <header className="p-5">
-        <h1 className="text-xl font-semibold text-white">Pix</h1>
-        <p className="text-nox-textSecondary mt-1">Pagamentos instantâneos</p>
-      </header>
+
+  const handleAmountSubmit = () => {
+    const parsedAmount = parseFloat(amount.replace(/[^\d,]/g, "").replace(",", "."));
+    
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um valor válido",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (profile && parsedAmount > Number(profile.account_balance)) {
+      toast({
+        title: "Saldo insuficiente",
+        description: "Você não possui saldo suficiente para esta transferência",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setStep("confirm");
+  };
+
+  const handleConfirmPix = async () => {
+    if (!user || !selectedUser) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const parsedAmount = parseFloat(amount.replace(/[^\d,]/g, "").replace(",", "."));
       
-      {/* Tab Navigation */}
-      <div className="px-5">
-        <div className="flex overflow-x-auto space-x-2 pb-2">
-          <Button 
-            variant={activeTab === 'send' ? 'default' : 'outline'} 
-            onClick={() => setActiveTab('send')}
-            className={`flex-shrink-0 ${activeTab === 'send' ? 'bg-nox-primary hover:bg-nox-primary/90' : 'border-zinc-700 text-white'}`}
-          >
-            <ArrowUpRight className="h-4 w-4 mr-2" />
-            Enviar
-          </Button>
-          <Button 
-            variant={activeTab === 'receive' ? 'default' : 'outline'} 
-            onClick={() => setActiveTab('receive')}
-            className={`flex-shrink-0 ${activeTab === 'receive' ? 'bg-nox-primary hover:bg-nox-primary/90' : 'border-zinc-700 text-white'}`}
-          >
-            <QrCode className="h-4 w-4 mr-2" />
-            Receber
-          </Button>
-          <Button 
-            variant={activeTab === 'keys' ? 'default' : 'outline'} 
-            onClick={() => setActiveTab('keys')}
-            className={`flex-shrink-0 ${activeTab === 'keys' ? 'bg-nox-primary hover:bg-nox-primary/90' : 'border-zinc-700 text-white'}`}
-          >
-            <Key className="h-4 w-4 mr-2" />
-            Chaves
-          </Button>
-          <Button 
-            variant={activeTab === 'scheduled' ? 'default' : 'outline'} 
-            onClick={() => setActiveTab('scheduled')}
-            className={`flex-shrink-0 ${activeTab === 'scheduled' ? 'bg-nox-primary hover:bg-nox-primary/90' : 'border-zinc-700 text-white'}`}
-          >
-            <Clock className="h-4 w-4 mr-2" />
-            Agendados
-          </Button>
-          <Button 
-            variant={activeTab === 'history' ? 'default' : 'outline'} 
-            onClick={() => setActiveTab('history')}
-            className={`flex-shrink-0 ${activeTab === 'history' ? 'bg-nox-primary hover:bg-nox-primary/90' : 'border-zinc-700 text-white'}`}
-          >
-            <Receipt className="h-4 w-4 mr-2" />
-            Histórico
-          </Button>
-        </div>
-      </div>
+      // Call the transaction processing function via RPC
+      const { data, error } = await supabase.rpc(
+        'process_transaction',
+        {
+          sender_id: user.id,
+          receiver_id: selectedUser.id,
+          amount: parsedAmount,
+          transaction_type: 'pix',
+          description: `Pix para ${selectedUser.username}`
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh user profile to update balance
+      await refreshProfile();
       
-      {/* Tab Content */}
-      <div className="p-5">
-        {activeTab === 'send' && (
-          <div className="space-y-4">
-            <PixOption 
-              icon={Key} 
-              title="Transferir com chave Pix" 
-              description="Envie para CPF, email, telefone ou chave aleatória"
-              onClick={openTransferPage}
-            />
-            <PixOption 
-              icon={QrCode} 
-              title="Pagar com QR Code" 
-              description="Escaneie o código para pagar"
-              onClick={() => {}}
-            />
-          </div>
-        )}
-        
-        {activeTab === 'receive' && (
-          <div className="space-y-4">
-            <div className="nox-card border border-zinc-800">
-              <h3 className="text-white mb-4">Seu QR Code Pix</h3>
+      setStep("success");
+    } catch (error: any) {
+      console.error('Error processing Pix:', error);
+      
+      toast({
+        title: "Erro no Pix",
+        description: error.message || "Ocorreu um erro ao processar seu Pix",
+        variant: "destructive",
+      });
+      
+      setIsProcessing(false);
+    }
+  };
+
+  const renderSendContent = () => {
+    switch (step) {
+      case "key":
+        return (
+          <div className="space-y-6">
+            <div className="bg-nox-card p-5 rounded-xl">
+              <h3 className="text-lg font-medium text-white mb-4">Digite a chave Pix</h3>
               
-              <div className="bg-white p-4 rounded-lg flex items-center justify-center mb-4">
-                <QrCode className="h-40 w-40 text-black" />
+              <div className="space-y-4">
+                <Input
+                  value={pixKey}
+                  onChange={(e) => setPixKey(e.target.value)}
+                  placeholder="@username"
+                  className="bg-nox-background text-white border-zinc-700"
+                />
+                
+                <Button
+                  onClick={handlePixKeySearch}
+                  className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white"
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? "Buscando..." : "Continuar"}
+                </Button>
               </div>
-              
-              <Button className="w-full nox-button-primary">
-                Compartilhar QR Code
-              </Button>
             </div>
             
-            <div className="nox-card border border-zinc-800">
-              <h3 className="text-white mb-4">Sua chave Pix principal</h3>
+            <div className="bg-nox-card p-5 rounded-xl">
+              <h3 className="text-lg font-medium text-white mb-4">Chaves Pix recentes</h3>
               
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-nox-textSecondary">CPF</p>
-                  <p className="text-white">123.456.789-00</p>
+              <p className="text-nox-textSecondary">
+                Suas chaves Pix recentes aparecerão aqui para facilitar transações futuras.
+              </p>
+            </div>
+          </div>
+        );
+        
+      case "amount":
+        return (
+          <div className="space-y-6">
+            <div className="bg-nox-card p-5 rounded-xl">
+              <div className="flex items-center mb-4">
+                <div className="h-12 w-12 rounded-full bg-nox-buttonInactive flex items-center justify-center mr-3">
+                  <User className="h-6 w-6 text-white" />
                 </div>
+                <div>
+                  <p className="text-white font-medium">{selectedUser?.full_name}</p>
+                  <p className="text-nox-textSecondary text-sm">{selectedUser?.username} • {selectedUser?.account_number}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-nox-textSecondary text-sm">Valor do Pix</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3 h-5 w-5 text-nox-primary" />
+                    <Input 
+                      className="pl-10 text-xl py-6 bg-nox-background text-white border-zinc-700 focus:border-nox-primary"
+                      value={amount}
+                      onChange={handleAmountChange}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                  {profile && (
+                    <p className="text-sm text-nox-textSecondary text-right">
+                      Saldo disponível: R$ {Number(profile.account_balance).toFixed(2).replace('.', ',')}
+                    </p>
+                  )}
+                </div>
+                
                 <Button 
-                  variant="outline" 
-                  onClick={() => copyToClipboard("123.456.789-00")}
-                  className="border-nox-primary text-nox-primary"
+                  onClick={handleAmountSubmit}
+                  className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white"
                 >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copiar
+                  Continuar
                 </Button>
               </div>
             </div>
           </div>
-        )}
+        );
         
-        {activeTab === 'keys' && (
-          <div className="space-y-4">
-            {pixKeys.map((key, index) => (
-              <div key={index} className="nox-card border border-zinc-800">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-nox-textSecondary">{key.type}</p>
-                    <p className="text-white">{key.value}</p>
-                  </div>
-                  <div className="flex items-center">
-                    <div className={`h-2 w-2 rounded-full mr-2 ${key.registered ? 'bg-nox-primary' : 'bg-nox-buttonInactive'}`}></div>
-                    <span className="text-xs text-nox-textSecondary mr-4">
-                      {key.registered ? 'Ativa' : 'Inativa'}
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => copyToClipboard(key.value)}
-                      className="text-nox-primary p-2 h-auto"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
+      case "confirm":
+        return (
+          <div className="space-y-6">
+            <div className="bg-nox-card p-5 rounded-xl space-y-4">
+              <h3 className="text-lg font-medium text-white text-center">Confirmar Pix</h3>
+              
+              <div className="py-4 text-center">
+                <p className="text-nox-textSecondary text-sm">Valor</p>
+                <p className="text-white text-3xl font-bold mt-1">{amount}</p>
+              </div>
+              
+              <div className="border-t border-zinc-800 pt-4">
+                <div className="flex justify-between">
+                  <p className="text-nox-textSecondary">Para</p>
+                  <p className="text-white font-medium">
+                    {selectedUser?.full_name}
+                  </p>
+                </div>
+                
+                <div className="flex justify-between mt-2">
+                  <p className="text-nox-textSecondary">Chave Pix</p>
+                  <p className="text-white">
+                    {selectedUser?.username}
+                  </p>
+                </div>
+                
+                <div className="flex justify-between mt-2">
+                  <p className="text-nox-textSecondary">Data</p>
+                  <p className="text-white">{new Date().toLocaleDateString('pt-BR')}</p>
                 </div>
               </div>
-            ))}
+            </div>
             
-            <Button className="w-full nox-button-primary">
-              Cadastrar nova chave Pix
+            <div className="bg-nox-card p-4 rounded-xl">
+              <p className="text-nox-textSecondary text-sm">
+                Ao confirmar, você concorda com os nossos termos e condições para transações Pix.
+              </p>
+            </div>
+            
+            <div className="flex space-x-4">
+              <Button 
+                variant="outline" 
+                className="flex-1 py-6 border-nox-textSecondary bg-transparent text-white hover:bg-nox-card"
+                onClick={() => setStep("amount")}
+                disabled={isProcessing}
+              >
+                Voltar
+              </Button>
+              <Button 
+                className="flex-1 py-6 bg-nox-primary hover:bg-nox-primary/90 text-white"
+                onClick={handleConfirmPix}
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Processando..." : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        );
+        
+      case "success":
+        return (
+          <div className="flex flex-col items-center justify-center h-[60vh] space-y-6">
+            <div className="h-24 w-24 rounded-full bg-nox-primary/20 flex items-center justify-center mb-6 animate-pulse">
+              <QrCode className="h-12 w-12 text-nox-primary" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-white">Pix enviado!</h2>
+            <p className="text-nox-textSecondary text-center">
+              Seu Pix foi processado com sucesso e o dinheiro foi transferido imediatamente.
+            </p>
+            
+            <div className="bg-nox-card p-4 rounded-xl w-full">
+              <div className="flex justify-between mb-2">
+                <p className="text-nox-textSecondary">Valor enviado</p>
+                <p className="text-white font-medium">{amount}</p>
+              </div>
+              <div className="flex justify-between">
+                <p className="text-nox-textSecondary">Para</p>
+                <p className="text-white">
+                  {selectedUser?.full_name}
+                </p>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full py-6 bg-nox-primary hover:bg-nox-primary/90 text-white"
+              onClick={() => navigate('/home')}
+            >
+              Voltar ao início
             </Button>
           </div>
-        )}
-        
-        {activeTab === 'scheduled' && (
-          <div className="flex flex-col items-center justify-center h-60">
-            <Clock className="h-12 w-12 text-nox-textSecondary mb-4" />
-            <p className="text-nox-textSecondary text-center">Você não possui nenhum Pix agendado.</p>
-          </div>
-        )}
-        
-        {activeTab === 'history' && (
-          <div className="space-y-4">
-            {/* We'd map through real transactions here */}
-            <div className="nox-card border border-zinc-800">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-white">Maria Oliveira</h4>
-                  <p className="text-sm text-nox-textSecondary">Ontem às 14:30</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-red-500">-R$ 50,00</p>
-                  <p className="text-xs text-nox-textSecondary">Enviado</p>
-                </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-nox-background pb-20">
+      {/* Header */}
+      <header className="p-5">
+        <div className="flex items-center">
+          <button 
+            className="p-2 rounded-full bg-nox-card mr-3"
+            onClick={() => {
+              if (activeTab === "send" && step !== "key") {
+                if (step === "success") {
+                  navigate('/home');
+                } else {
+                  setStep("key");
+                }
+              } else {
+                navigate('/home');
+              }
+            }}
+          >
+            <ArrowLeft className="h-5 w-5 text-nox-textSecondary" />
+          </button>
+          <h1 className="text-xl font-semibold text-white">
+            {activeTab === "send" && step === "success" ? "Pix enviado" : "Pix"}
+          </h1>
+        </div>
+      </header>
+      
+      <div className="px-5">
+        <Tabs 
+          defaultValue="receive" 
+          value={activeTab} 
+          onValueChange={(value) => {
+            setActiveTab(value as "receive" | "send");
+            setStep("key");
+          }}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2 bg-nox-card mb-6">
+            <TabsTrigger value="receive">Receber</TabsTrigger>
+            <TabsTrigger value="send">Enviar</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="receive" className="space-y-6">
+            <div className="bg-nox-card p-5 rounded-xl space-y-6">
+              <h3 className="text-lg font-medium text-white mb-4">Chave Pix</h3>
+              
+              <div className="bg-nox-background p-4 rounded-lg flex items-center justify-between">
+                <p className="text-white">{profile?.username}</p>
+                <button 
+                  className="p-2 rounded-full hover:bg-nox-card"
+                  onClick={() => profile && copyToClipboard(profile.username)}
+                >
+                  <Copy className="h-4 w-4 text-nox-textSecondary" />
+                </button>
               </div>
+              
+              <Button 
+                variant="outline" 
+                className="w-full border border-zinc-700 text-white"
+                onClick={() => profile && copyToClipboard(profile.username)}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copiar chave
+              </Button>
             </div>
             
-            <div className="nox-card border border-zinc-800">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-white">Carlos Santos</h4>
-                  <p className="text-sm text-nox-textSecondary">20/05 às 10:15</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-green-500">+R$ 120,00</p>
-                  <p className="text-xs text-nox-textSecondary">Recebido</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="nox-card border border-zinc-800">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-white">Mercado Express</h4>
-                  <p className="text-sm text-nox-textSecondary">18/05 às 17:45</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-red-500">-R$ 32,90</p>
-                  <p className="text-xs text-nox-textSecondary">Enviado</p>
+            <div className="bg-nox-card p-5 rounded-xl space-y-6">
+              <h3 className="text-lg font-medium text-white mb-4">QR Code</h3>
+              
+              <div className="flex justify-center">
+                <div className="h-48 w-48 rounded-lg bg-white p-2">
+                  <div className="h-full w-full flex items-center justify-center border-4 border-dashed border-gray-200">
+                    <QrCode className="h-20 w-20 text-zinc-800" />
+                  </div>
                 </div>
               </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <Button 
+                  variant="outline" 
+                  className="border border-zinc-700 text-white"
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Compartilhar
+                </Button>
+                
+                <Button 
+                  className="bg-nox-primary hover:bg-nox-primary/90 text-white"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar código
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          </TabsContent>
+          
+          <TabsContent value="send">
+            {renderSendContent()}
+          </TabsContent>
+        </Tabs>
       </div>
       
       <BottomNav activeTab="home" />

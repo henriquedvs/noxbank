@@ -1,14 +1,14 @@
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Logo from '@/components/logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
-  const navigate = useNavigate();
+  const { signIn, session, loading } = useAuth();
   const [formData, setFormData] = useState({
     identifier: '',
     password: '',
@@ -16,6 +16,11 @@ const Login = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already logged in
+  if (session) {
+    return <Navigate to="/home" />;
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -37,13 +42,13 @@ const Login = () => {
     setIsLoading(true);
     setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await signIn(formData.identifier, formData.password, formData.rememberMe);
+    } catch (error: any) {
+      setError(error.message || 'Erro ao fazer login');
+    } finally {
       setIsLoading(false);
-      
-      // Mock success login - in a real app, verify credentials with a backend
-      navigate('/home');
-    }, 1500);
+    }
   };
 
   return (
@@ -65,7 +70,7 @@ const Login = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label htmlFor="identifier" className="block text-sm font-medium text-nox-textSecondary mb-1">
-                E-mail ou CPF
+                E-mail
               </label>
               <Input
                 id="identifier"

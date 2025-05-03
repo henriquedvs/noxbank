@@ -1,19 +1,18 @@
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Logo from '@/components/logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from '@/contexts/AuthContext';
 
 type StepKey = 'personal' | 'address' | 'income' | 'password';
 
 const SignupSteps = {
   personal: {
     title: 'Dados Pessoais',
-    fields: ['name', 'cpf', 'birthDate', 'email', 'phone']
+    fields: ['name', 'username', 'cpf', 'birthDate', 'email', 'phone']
   },
   address: {
     title: 'Endereço',
@@ -32,6 +31,7 @@ const SignupSteps = {
 const initialFormData = {
   // Personal data
   name: '',
+  username: '',
   cpf: '',
   birthDate: '',
   email: '',
@@ -57,11 +57,16 @@ const initialFormData = {
 };
 
 const Signup = () => {
-  const navigate = useNavigate();
+  const { signUp, session, loading } = useAuth();
   const [currentStep, setCurrentStep] = useState<StepKey>('personal');
   const [formData, setFormData] = useState(initialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already logged in
+  if (session) {
+    return <Navigate to="/home" />;
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -78,9 +83,27 @@ const Signup = () => {
     });
   };
 
+  const validateUsername = (username: string): boolean => {
+    return /^@?[a-zA-Z0-9_.]+$/.test(username);
+  };
+
+  const formatUsername = (username: string): string => {
+    // Ensure username starts with @
+    if (!username.startsWith('@')) {
+      return '@' + username;
+    }
+    return username;
+  };
+
   const nextStep = () => {
-    if (currentStep === 'personal') setCurrentStep('address');
-    else if (currentStep === 'address') setCurrentStep('income');
+    if (currentStep === 'personal') {
+      // Validate username
+      if (!validateUsername(formData.username)) {
+        setError('Nome de usuário inválido. Use apenas letras, números, _ ou .');
+        return;
+      }
+      setCurrentStep('address');
+    } else if (currentStep === 'address') setCurrentStep('income');
     else if (currentStep === 'income') setCurrentStep('password');
   };
 
@@ -111,11 +134,13 @@ const Signup = () => {
     setIsLoading(true);
     setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const formattedUsername = formatUsername(formData.username);
+      await signUp(formData.email, formData.password, formattedUsername, formData.name);
+    } catch (error: any) {
+      setError(error.message || 'Erro ao criar conta');
       setIsLoading(false);
-      navigate('/home');
-    }, 1500);
+    }
   };
 
   const renderFormFields = () => {
@@ -135,6 +160,32 @@ const Signup = () => {
                 onChange={handleChange}
                 required
               />
+            </div>
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-nox-textSecondary mb-1">
+                Nome de Usuário
+              </label>
+              <div className="relative">
+                <Input
+                  id="username"
+                  name="username"
+                  className="nox-input pl-6"
+                  value={formData.username}
+                  onChange={(e) => {
+                    // Remove @ if user types it (we'll add it later)
+                    const value = e.target.value.startsWith('@') 
+                      ? e.target.value.substring(1) 
+                      : e.target.value;
+                    setFormData({
+                      ...formData,
+                      username: value
+                    });
+                  }}
+                  placeholder="seuusername"
+                  required
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-nox-textSecondary">@</span>
+              </div>
             </div>
             <div>
               <label htmlFor="cpf" className="block text-sm font-medium text-nox-textSecondary mb-1">

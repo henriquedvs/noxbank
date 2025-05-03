@@ -1,45 +1,175 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Search, User, Clock, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "@/components/bottom-nav";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-// Mock data for recent contacts
-const recentContacts = [
-  { id: 1, name: "Maria Silva", bankInfo: "NoxBank", accountNumber: "****3456", image: null },
-  { id: 2, name: "Carlos Oliveira", bankInfo: "Banco X", accountNumber: "****7890", image: null },
-  { id: 3, name: "Ana Pereira", bankInfo: "NoxBank", accountNumber: "****2345", image: null },
-];
+interface Contact {
+  id: string;
+  username: string;
+  full_name: string;
+  account_number: string;
+  avatar_url: string | null;
+}
 
 type TransferStep = "select-contact" | "amount" | "details" | "confirm" | "success";
 
 const Transfer = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile, refreshProfile } = useAuth();
   const [step, setStep] = useState<TransferStep>("select-contact");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedContact, setSelectedContact] = useState<typeof recentContacts[0] | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [isNewTransfer, setIsNewTransfer] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState<Contact[]>([]);
+  const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
   const [newContactData, setNewContactData] = useState({
-    name: "",
-    cpf: "",
-    bank: "",
-    agency: "",
-    account: ""
+    username: "",
   });
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!user) return;
+      
+      try {
+        // Fetch all users except current user
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, account_number, avatar_url')
+          .neq('id', user.id);
+
+        if (error) {
+          console.error('Error fetching users:', error);
+          return;
+        }
+
+        setAllUsers(data);
+
+        // Fetch recent contacts (users that the current user has transferred money to)
+        const { data: transactions, error: transactionsError } = await supabase
+          .from('transactions')
+          .select(`
+            receiver_id,
+            profiles!transactions_receiver_id_fkey(id, username, full_name, account_number, avatar_url)
+          `)
+          .eq('sender_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (transactionsError) {
+          console.error('Error fetching recent transactions:', transactionsError);
+          return;
+        }
+
+        // Extract unique receivers
+        const uniqueReceivers = transactions
+          .filter(t => t.receiver_id !== user.id) // Exclude self-transfers
+          .reduce((acc, current) => {
+            const receiver = current.profiles as Contact;
+            const exists = acc.find(item => item.id === receiver.id);
+            if (!exists) {
+              acc.push(receiver);
+            }
+            return acc;
+          }, [] as Contact[]);
+
+        setRecentContacts(uniqueReceivers);
+      } catch (error) {
+        console.error('Error in fetchUsers:', error);
+      }
+    };
+
+    fetchUsers();
+  }, [user]);
+
   const filteredContacts = recentContacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase())
+    contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleContactSelect = (contact: typeof recentContacts[0]) => {
+  const filteredAllUsers = searchTerm 
+    ? allUsers.filter(contact => 
+        contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
+
+  const handleContactSelect = (contact: Contact) => {
     setSelectedContact(contact);
     setStep("amount");
+  };
+
+  const handleSearchUser = async () => {
+    if (!newContactData.username) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um nome de usuário válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const username = newContactData.username.startsWith('@') 
+        ? newContactData.username.substring(1) 
+        : newContactData.username;
+        
+      // Search for the user in Supabase
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, account_number, avatar_url')
+        .ilike('username', `%${username}%`)
+        .limit(1);
+
+      if (error) {
+        console.error('Error searching for user:', error);
+        toast({
+          title: "Erro",
+          description: "Ocorreu um erro ao buscar o usuário",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        toast({
+          title: "Usuário não encontrado",
+          description: "Não foi possível encontrar um usuário com este nome",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data[0].id === user?.id) {
+        toast({
+          title: "Erro",
+          description: "Você não pode transferir para sua própria conta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSelectedContact(data[0]);
+      setIsNewTransfer(false);
+      setStep("amount");
+    } catch (error) {
+      console.error('Error in handleSearchUser:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao buscar o usuário",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleNewTransfer = () => {
@@ -48,7 +178,9 @@ const Transfer = () => {
   };
 
   const handleAmountSubmit = () => {
-    if (!amount || parseFloat(amount.replace(/[^\d]/g, "")) / 100 <= 0) {
+    const parsedAmount = parseFloat(amount.replace(/[^\d,]/g, "").replace(",", "."));
+    
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
       toast({
         title: "Erro",
         description: "Por favor, insira um valor válido",
@@ -56,18 +188,66 @@ const Transfer = () => {
       });
       return;
     }
-    setStep("details");
+    
+    if (profile && parsedAmount > Number(profile.account_balance)) {
+      toast({
+        title: "Saldo insuficiente",
+        description: "Você não possui saldo suficiente para esta transferência",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isNewTransfer) {
+      setStep("details");
+    } else {
+      setStep("details");
+    }
   };
 
   const handleDetailsSubmit = () => {
     setStep("confirm");
   };
 
-  const handleConfirmTransfer = () => {
-    // In a real app, we would call an API here
-    setTimeout(() => {
+  const handleConfirmTransfer = async () => {
+    if (!user || !selectedContact) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const parsedAmount = parseFloat(amount.replace(/[^\d,]/g, "").replace(",", "."));
+      
+      // Call the transaction processing function via RPC
+      const { data, error } = await supabase.rpc(
+        'process_transaction',
+        {
+          sender_id: user.id,
+          receiver_id: selectedContact.id,
+          amount: parsedAmount,
+          transaction_type: 'transfer',
+          description: description || null
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh user profile to update balance
+      await refreshProfile();
+      
       setStep("success");
-    }, 1500);
+    } catch (error: any) {
+      console.error('Error processing transfer:', error);
+      
+      toast({
+        title: "Erro na transferência",
+        description: error.message || "Ocorreu um erro ao processar sua transferência",
+        variant: "destructive",
+      });
+      
+      setIsLoading(false);
+    }
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,6 +267,14 @@ const Transfer = () => {
     return value;
   };
 
+  const getInitials = (name: string) => {
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0].substring(0, 2).toUpperCase();
+  };
+
   const renderStepContent = () => {
     switch (step) {
       case "select-contact":
@@ -103,25 +291,65 @@ const Transfer = () => {
             </div>
             
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-white">Transferências recentes</h3>
-              {filteredContacts.map(contact => (
-                <div 
-                  key={contact.id} 
-                  className="bg-nox-card p-4 rounded-xl flex items-center justify-between cursor-pointer hover:border hover:border-nox-primary transition-all"
-                  onClick={() => handleContactSelect(contact)}
-                >
-                  <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-full bg-nox-buttonInactive flex items-center justify-center mr-3">
-                      <User className="h-6 w-6 text-white" />
+              {(searchTerm && filteredAllUsers.length > 0) && (
+                <>
+                  <h3 className="text-lg font-medium text-white">Resultados da busca</h3>
+                  {filteredAllUsers.map(contact => (
+                    <div 
+                      key={contact.id} 
+                      className="bg-nox-card p-4 rounded-xl flex items-center justify-between cursor-pointer hover:border hover:border-nox-primary transition-all"
+                      onClick={() => handleContactSelect(contact)}
+                    >
+                      <div className="flex items-center">
+                        <Avatar className="h-12 w-12 mr-3">
+                          {contact.avatar_url ? (
+                            <img src={contact.avatar_url} alt={contact.full_name} />
+                          ) : (
+                            <AvatarFallback className="bg-nox-buttonInactive text-white">
+                              {getInitials(contact.full_name)}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div>
+                          <p className="text-white font-medium">{contact.full_name}</p>
+                          <p className="text-nox-textSecondary text-sm">{contact.username} • {contact.account_number}</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-nox-textSecondary" />
                     </div>
-                    <div>
-                      <p className="text-white font-medium">{contact.name}</p>
-                      <p className="text-nox-textSecondary text-sm">{contact.bankInfo} • {contact.accountNumber}</p>
+                  ))}
+                </>
+              )}
+              
+              {filteredContacts.length > 0 && (
+                <>
+                  <h3 className="text-lg font-medium text-white">Transferências recentes</h3>
+                  {filteredContacts.map(contact => (
+                    <div 
+                      key={contact.id} 
+                      className="bg-nox-card p-4 rounded-xl flex items-center justify-between cursor-pointer hover:border hover:border-nox-primary transition-all"
+                      onClick={() => handleContactSelect(contact)}
+                    >
+                      <div className="flex items-center">
+                        <Avatar className="h-12 w-12 mr-3">
+                          {contact.avatar_url ? (
+                            <img src={contact.avatar_url} alt={contact.full_name} />
+                          ) : (
+                            <AvatarFallback className="bg-nox-buttonInactive text-white">
+                              {getInitials(contact.full_name)}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div>
+                          <p className="text-white font-medium">{contact.full_name}</p>
+                          <p className="text-nox-textSecondary text-sm">{contact.username} • {contact.account_number}</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-nox-textSecondary" />
                     </div>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-nox-textSecondary" />
-                </div>
-              ))}
+                  ))}
+                </>
+              )}
               
               <div 
                 className="bg-nox-card p-4 rounded-xl flex items-center justify-between cursor-pointer hover:border hover:border-nox-primary transition-all"
@@ -144,12 +372,18 @@ const Transfer = () => {
           <div className="space-y-6">
             <div className="bg-nox-card p-4 rounded-xl">
               <div className="flex items-center">
-                <div className="h-12 w-12 rounded-full bg-nox-buttonInactive flex items-center justify-center mr-3">
-                  <User className="h-6 w-6 text-white" />
-                </div>
+                <Avatar className="h-12 w-12 mr-3">
+                  {selectedContact?.avatar_url ? (
+                    <img src={selectedContact.avatar_url} alt={selectedContact.full_name} />
+                  ) : (
+                    <AvatarFallback className="bg-nox-buttonInactive text-white">
+                      {selectedContact ? getInitials(selectedContact.full_name) : 'U'}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <div>
-                  <p className="text-white font-medium">{selectedContact?.name}</p>
-                  <p className="text-nox-textSecondary text-sm">{selectedContact?.bankInfo} • {selectedContact?.accountNumber}</p>
+                  <p className="text-white font-medium">{selectedContact?.full_name}</p>
+                  <p className="text-nox-textSecondary text-sm">{selectedContact?.username} • {selectedContact?.account_number}</p>
                 </div>
               </div>
             </div>
@@ -165,6 +399,11 @@ const Transfer = () => {
                   placeholder="R$ 0,00"
                 />
               </div>
+              {profile && (
+                <p className="text-sm text-nox-textSecondary text-right">
+                  Saldo disponível: R$ {Number(profile.account_balance).toFixed(2).replace('.', ',')}
+                </p>
+              )}
             </div>
             
             <Button 
@@ -179,15 +418,21 @@ const Transfer = () => {
       case "details":
         return (
           <div className="space-y-6">
-            {!isNewTransfer ? (
+            {!isNewTransfer && selectedContact ? (
               <div className="bg-nox-card p-4 rounded-xl">
                 <div className="flex items-center">
-                  <div className="h-12 w-12 rounded-full bg-nox-buttonInactive flex items-center justify-center mr-3">
-                    <User className="h-6 w-6 text-white" />
-                  </div>
+                  <Avatar className="h-12 w-12 mr-3">
+                    {selectedContact.avatar_url ? (
+                      <img src={selectedContact.avatar_url} alt={selectedContact.full_name} />
+                    ) : (
+                      <AvatarFallback className="bg-nox-buttonInactive text-white">
+                        {getInitials(selectedContact.full_name)}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
                   <div>
-                    <p className="text-white font-medium">{selectedContact?.name}</p>
-                    <p className="text-nox-textSecondary text-sm">{selectedContact?.bankInfo} • {selectedContact?.accountNumber}</p>
+                    <p className="text-white font-medium">{selectedContact.full_name}</p>
+                    <p className="text-nox-textSecondary text-sm">{selectedContact.username} • {selectedContact.account_number}</p>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-zinc-800">
@@ -200,48 +445,21 @@ const Transfer = () => {
                 <h3 className="text-lg font-medium text-white">Nova transferência</h3>
                 
                 <div className="space-y-2">
-                  <label className="text-nox-textSecondary text-sm">Nome completo</label>
-                  <Input 
-                    className="bg-nox-background text-white border-zinc-700"
-                    value={newContactData.name}
-                    onChange={(e) => setNewContactData({...newContactData, name: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-nox-textSecondary text-sm">CPF/CNPJ</label>
-                  <Input 
-                    className="bg-nox-background text-white border-zinc-700"
-                    value={newContactData.cpf}
-                    onChange={(e) => setNewContactData({...newContactData, cpf: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-nox-textSecondary text-sm">Banco</label>
-                  <Input 
-                    className="bg-nox-background text-white border-zinc-700"
-                    value={newContactData.bank}
-                    onChange={(e) => setNewContactData({...newContactData, bank: e.target.value})}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-nox-textSecondary text-sm">Agência</label>
+                  <label className="text-nox-textSecondary text-sm">Nome de usuário</label>
+                  <div className="relative flex">
                     <Input 
-                      className="bg-nox-background text-white border-zinc-700"
-                      value={newContactData.agency}
-                      onChange={(e) => setNewContactData({...newContactData, agency: e.target.value})}
+                      className="pl-6 bg-nox-background text-white border-zinc-700 flex-1"
+                      value={newContactData.username}
+                      onChange={(e) => setNewContactData({...newContactData, username: e.target.value})}
+                      placeholder="username"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-nox-textSecondary text-sm">Conta</label>
-                    <Input 
-                      className="bg-nox-background text-white border-zinc-700"
-                      value={newContactData.account}
-                      onChange={(e) => setNewContactData({...newContactData, account: e.target.value})}
-                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-nox-textSecondary">@</span>
+                    <Button
+                      className="ml-2 bg-nox-primary"
+                      onClick={handleSearchUser}
+                    >
+                      <Search className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 
@@ -256,6 +474,11 @@ const Transfer = () => {
                       placeholder="R$ 0,00"
                     />
                   </div>
+                  {profile && (
+                    <p className="text-sm text-nox-textSecondary text-right">
+                      Saldo disponível: R$ {Number(profile.account_balance).toFixed(2).replace('.', ',')}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -282,6 +505,7 @@ const Transfer = () => {
               <Button 
                 className="flex-1 py-6 bg-nox-primary hover:bg-nox-primary/90 text-white"
                 onClick={handleDetailsSubmit}
+                disabled={!selectedContact}
               >
                 Transferir agora
               </Button>
@@ -304,29 +528,21 @@ const Transfer = () => {
                 <div className="flex justify-between">
                   <p className="text-nox-textSecondary">Para</p>
                   <p className="text-white font-medium">
-                    {isNewTransfer ? newContactData.name : selectedContact?.name}
+                    {selectedContact?.full_name}
                   </p>
                 </div>
                 
                 <div className="flex justify-between mt-2">
-                  <p className="text-nox-textSecondary">Banco</p>
+                  <p className="text-nox-textSecondary">Usuário</p>
                   <p className="text-white">
-                    {isNewTransfer ? newContactData.bank : selectedContact?.bankInfo}
+                    {selectedContact?.username}
                   </p>
                 </div>
                 
-                {isNewTransfer && (
-                  <>
-                    <div className="flex justify-between mt-2">
-                      <p className="text-nox-textSecondary">Agência</p>
-                      <p className="text-white">{newContactData.agency}</p>
-                    </div>
-                    <div className="flex justify-between mt-2">
-                      <p className="text-nox-textSecondary">Conta</p>
-                      <p className="text-white">{newContactData.account}</p>
-                    </div>
-                  </>
-                )}
+                <div className="flex justify-between mt-2">
+                  <p className="text-nox-textSecondary">Conta</p>
+                  <p className="text-white">{selectedContact?.account_number}</p>
+                </div>
                 
                 {description && (
                   <div className="flex justify-between mt-2">
@@ -353,14 +569,16 @@ const Transfer = () => {
                 variant="outline" 
                 className="flex-1 py-6 border-nox-textSecondary bg-transparent text-white hover:bg-nox-card"
                 onClick={() => setStep("details")}
+                disabled={isLoading}
               >
                 Voltar
               </Button>
               <Button 
                 className="flex-1 py-6 bg-nox-primary hover:bg-nox-primary/90 text-white"
                 onClick={handleConfirmTransfer}
+                disabled={isLoading}
               >
-                Confirmar
+                {isLoading ? "Processando..." : "Confirmar"}
               </Button>
             </div>
           </div>
@@ -386,7 +604,7 @@ const Transfer = () => {
               <div className="flex justify-between">
                 <p className="text-nox-textSecondary">Para</p>
                 <p className="text-white">
-                  {isNewTransfer ? newContactData.name : selectedContact?.name}
+                  {selectedContact?.full_name}
                 </p>
               </div>
             </div>
