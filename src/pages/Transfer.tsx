@@ -54,7 +54,12 @@ const Transfer = () => {
           return;
         }
 
-        setAllUsers(data);
+        // Filter out any null entries from data
+        const validUsers = data.filter(contact => 
+          contact && contact.username && contact.full_name
+        );
+        
+        setAllUsers(validUsers);
 
         // Fetch recent contacts (users that the current user has transferred money to)
         const { data: transactions, error: transactionsError } = await supabase
@@ -72,11 +77,13 @@ const Transfer = () => {
           return;
         }
 
-        // Extract unique receivers
+        // Extract unique receivers and filter out null values
         const uniqueReceivers = transactions
-          .filter(t => t.receiver_id !== user.id) // Exclude self-transfers
+          .filter(t => t.receiver_id !== user.id && t.profiles && t.profiles.username) // Exclude self-transfers and null profiles
           .reduce((acc, current) => {
             const receiver = current.profiles as Contact;
+            if (!receiver) return acc;
+            
             const exists = acc.find(item => item.id === receiver.id);
             if (!exists) {
               acc.push(receiver);
@@ -97,13 +104,22 @@ const Transfer = () => {
   useEffect(() => {
     if (searchTerm && searchTerm.length >= 2) {
       const delaySearch = setTimeout(() => {
+        // Only filter valid contacts
         const filtered = allUsers.filter(contact => 
-          contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+          contact && contact.username && contact.full_name &&
+          (contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
         );
+        
         setAllUsers(prevUsers => {
-          // Ordenando para mostrar primeiro resultados mais relevantes
-          return [...prevUsers].sort((a, b) => {
+          // Filter out invalid users first
+          const validUsers = prevUsers.filter(user => user && user.username);
+          
+          // Then sort by relevance
+          return validUsers.sort((a, b) => {
+            if (!a || !a.username) return 1;
+            if (!b || !b.username) return -1;
+            
             const aMatch = a.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
             const bMatch = b.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
             return bMatch - aMatch;
@@ -116,14 +132,18 @@ const Transfer = () => {
   }, [searchTerm]);
 
   const filteredContacts = recentContacts.filter(contact => 
-    contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    contact && contact.username && contact.full_name && (
+      contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const filteredAllUsers = searchTerm && searchTerm.length >= 2
     ? allUsers.filter(contact => 
-        contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+        contact && contact.username && contact.full_name && (
+          contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
       )
     : [];
 
