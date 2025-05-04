@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Search, User, Clock, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import AccountDisplay from "@/components/account-display";
 
 interface Contact {
   id: string;
@@ -35,7 +35,7 @@ const Transfer = () => {
   const [allUsers, setAllUsers] = useState<Contact[]>([]);
   const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
   const [newContactData, setNewContactData] = useState({
-    username: "",
+    accountNumber: "",
   });
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const Transfer = () => {
 
         // Filter out any null entries from data
         const validUsers = data.filter(contact => 
-          contact && contact.username && contact.full_name
+          contact && contact.account_number && contact.full_name
         );
         
         console.log("All users fetched:", validUsers.length);
@@ -81,7 +81,7 @@ const Transfer = () => {
 
         // Extract unique receivers and filter out null values
         const uniqueReceivers = transactions
-          .filter(t => t.receiver_id !== user.id && t.profiles && t.profiles.username) // Exclude self-transfers and null profiles
+          .filter(t => t.receiver_id !== user.id && t.profiles && t.profiles.account_number) // Exclude self-transfers and null profiles
           .reduce((acc, current) => {
             const receiver = current.profiles as Contact;
             if (!receiver) return acc;
@@ -103,47 +103,46 @@ const Transfer = () => {
     fetchUsers();
   }, [user]);
 
-  // Melhorando a busca para ser mais responsiva e lidar melhor com @username
+  // Updating search to use account_number instead of username
   useEffect(() => {
     if (searchTerm && searchTerm.length >= 2) {
       const delaySearch = setTimeout(() => {
-        // Filtrando usuários com usernames válidos 
+        // Filtering users with valid account numbers 
         const filteredUsers = allUsers.filter(contact => {
-          if (!contact || !contact.username || !contact.full_name) return false;
+          if (!contact || !contact.account_number || !contact.full_name) return false;
           
-          // Removendo o @ do searchTerm se existir para a comparação
-          const cleanSearchTerm = searchTerm.startsWith('@') 
-            ? searchTerm.substring(1).toLowerCase() 
-            : searchTerm.toLowerCase();
+          // Remove any spaces or dashes from search term and account number
+          const cleanSearchTerm = searchTerm.replace(/[\s-]/g, "").toLowerCase();
+          const cleanAccountNumber = contact.account_number.replace(/[\s-]/g, "").toLowerCase();
             
-          return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+          return cleanAccountNumber.includes(cleanSearchTerm) ||
                  contact.full_name.toLowerCase().includes(cleanSearchTerm);
         });
         
         console.log("Filtered users by search term:", filteredUsers.length);
         
-        // Ordenando para priorizar correspondências exatas do username
+        // Sorting to prioritize exact account number matches
         setAllUsers(prevUsers => {
           // Filter out invalid users first
-          const validUsers = prevUsers.filter(user => user && user.username);
+          const validUsers = prevUsers.filter(user => user && user.account_number);
           
           // Then sort by relevance
           return validUsers.sort((a, b) => {
-            if (!a || !a.username) return 1;
-            if (!b || !b.username) return -1;
+            if (!a || !a.account_number) return 1;
+            if (!b || !b.account_number) return -1;
             
-            // Removendo o @ do searchTerm se existir para a comparação
-            const cleanSearchTerm = searchTerm.startsWith('@') 
-              ? searchTerm.substring(1).toLowerCase() 
-              : searchTerm.toLowerCase();
+            // Clean search term and account numbers for comparison
+            const cleanSearchTerm = searchTerm.replace(/[\s-]/g, "").toLowerCase();
+            const cleanAccountA = a.account_number.replace(/[\s-]/g, "").toLowerCase();
+            const cleanAccountB = b.account_number.replace(/[\s-]/g, "").toLowerCase();
               
-            // Priorizando correspondências exatas de username
-            if (a.username.toLowerCase() === cleanSearchTerm) return -1;
-            if (b.username.toLowerCase() === cleanSearchTerm) return 1;
+            // Prioritizing exact matches
+            if (cleanAccountA === cleanSearchTerm) return -1;
+            if (cleanAccountB === cleanSearchTerm) return 1;
             
-            // Em seguida, por correspondência parcial
-            const aMatch = a.username.toLowerCase().includes(cleanSearchTerm) ? 1 : 0;
-            const bMatch = b.username.toLowerCase().includes(cleanSearchTerm) ? 1 : 0;
+            // Then by partial matches
+            const aMatch = cleanAccountA.includes(cleanSearchTerm) ? 1 : 0;
+            const bMatch = cleanAccountB.includes(cleanSearchTerm) ? 1 : 0;
             return bMatch - aMatch;
           });
         });
@@ -153,30 +152,28 @@ const Transfer = () => {
     }
   }, [searchTerm]);
 
-  // Filtrando contatos recentes com tratamento de nulos e suporte para @username
+  // Filtering contacts using account number
   const filteredContacts = recentContacts.filter(contact => {
-    if (!contact || !contact.username || !contact.full_name) return false;
+    if (!contact || !contact.account_number || !contact.full_name) return false;
     
     if (!searchTerm) return true; // If no search term, show all recent contacts
     
-    const cleanSearchTerm = searchTerm.startsWith('@') 
-      ? searchTerm.substring(1).toLowerCase() 
-      : searchTerm.toLowerCase();
+    const cleanSearchTerm = searchTerm.replace(/[\s-]/g, "").toLowerCase();
+    const cleanAccountNumber = contact.account_number.replace(/[\s-]/g, "").toLowerCase();
       
-    return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+    return cleanAccountNumber.includes(cleanSearchTerm) ||
            contact.full_name.toLowerCase().includes(cleanSearchTerm);
   });
 
-  // Filtrando todos os usuários com tratamento de nulos e suporte para @username
+  // Filtering all users using account number
   const filteredAllUsers = searchTerm && searchTerm.length >= 2
     ? allUsers.filter(contact => {
-        if (!contact || !contact.username || !contact.full_name) return false;
+        if (!contact || !contact.account_number || !contact.full_name) return false;
         
-        const cleanSearchTerm = searchTerm.startsWith('@') 
-          ? searchTerm.substring(1).toLowerCase() 
-          : searchTerm.toLowerCase();
+        const cleanSearchTerm = searchTerm.replace(/[\s-]/g, "").toLowerCase();
+        const cleanAccountNumber = contact.account_number.replace(/[\s-]/g, "").toLowerCase();
           
-        return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+        return cleanAccountNumber.includes(cleanSearchTerm) ||
                contact.full_name.toLowerCase().includes(cleanSearchTerm);
       })
     : [];
@@ -187,99 +184,56 @@ const Transfer = () => {
     setStep("amount");
   };
 
-  const handleSearchUser = async () => {
-    if (!newContactData.username) {
+  const handleSearchAccount = async () => {
+    if (!newContactData.accountNumber) {
       toast({
         title: "Erro",
-        description: "Por favor, insira um nome de usuário válido",
+        description: "Por favor, insira um número de conta válido",
         variant: "destructive",
       });
       return;
     }
 
     setIsSearching(true);
-    console.log("Searching for user:", newContactData.username);
+    console.log("Searching for account:", newContactData.accountNumber);
     
     try {
-      // Formatando o username corretamente para busca
-      let searchUsername = newContactData.username;
-      if (searchUsername.startsWith('@')) {
-        searchUsername = searchUsername.substring(1);
-      }
+      // Clean up the account number for searching
+      let searchAccountNumber = newContactData.accountNumber.replace(/[\s-]/g, "");
       
-      console.log("Cleaned search username:", searchUsername);
+      console.log("Cleaned search account number:", searchAccountNumber);
         
-      // Search for the user in Supabase - first try exact match
+      // Search for the account in Supabase
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('username', searchUsername)
+        .ilike('account_number', `%${searchAccountNumber}%`)
         .limit(10);
 
       if (error) {
-        console.error('Error searching for user:', error);
+        console.error('Error searching for account:', error);
         toast({
           title: "Erro",
-          description: "Ocorreu um erro ao buscar o usuário: " + error.message,
+          description: "Ocorreu um erro ao buscar a conta: " + error.message,
           variant: "destructive",
         });
         setIsSearching(false);
         return;
       }
 
-      // If no exact match, try fuzzy search
+      // If no exact match, try fuzzy search (already done above but with stricter matching)
       if (!data || data.length === 0) {
-        console.log("No exact match, trying fuzzy search");
-        const { data: fuzzyData, error: fuzzyError } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, account_number, avatar_url')
-          .ilike('username', `%${searchUsername}%`)
-          .limit(10);
-          
-        if (fuzzyError) {
-          console.error('Error in fuzzy search:', fuzzyError);
-          toast({
-            title: "Erro",
-            description: "Ocorreu um erro na busca de usuário: " + fuzzyError.message,
-            variant: "destructive",
-          });
-          setIsSearching(false);
-          return;
-        }
-        
-        if (!fuzzyData || fuzzyData.length === 0) {
-          console.log("No user found with fuzzy search either");
-          toast({
-            title: "Usuário não encontrado",
-            description: "Não foi possível encontrar um usuário com este nome",
-            variant: "destructive",
-          });
-          setIsSearching(false);
-          return;
-        }
-        
-        // Check if any of the users found is the user themselves
-        const filteredFuzzyData = fuzzyData.filter(u => u.id !== user?.id);
-        
-        if (filteredFuzzyData.length === 0) {
-          toast({
-            title: "Erro",
-            description: "Você não pode transferir para sua própria conta",
-            variant: "destructive",
-          });
-          setIsSearching(false);
-          return;
-        }
-        
-        console.log("User found with fuzzy search:", filteredFuzzyData[0]);
-        setSelectedContact(filteredFuzzyData[0]);
-        setIsNewTransfer(false);
-        setStep("amount");
+        console.log("No account found");
+        toast({
+          title: "Conta não encontrada",
+          description: "Não foi possível encontrar uma conta com este número",
+          variant: "destructive",
+        });
         setIsSearching(false);
         return;
       }
-
-      // Verify if any of the found users is the user themselves
+      
+      // Check if any of the accounts found is the user themselves
       const filteredData = data.filter(u => u.id !== user?.id);
       
       if (filteredData.length === 0) {
@@ -291,18 +245,21 @@ const Transfer = () => {
         setIsSearching(false);
         return;
       }
-
-      // Selecting the most relevant user (exact match first)
-      console.log("User found with exact search:", filteredData[0]);
-      const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchUsername.toLowerCase());
+      
+      // Find exact match if possible
+      const exactMatch = filteredData.find(u => 
+        u.account_number.replace(/[\s-]/g, "").toLowerCase() === searchAccountNumber.toLowerCase()
+      );
+      
+      console.log("Account found:", exactMatch || filteredData[0]);
       setSelectedContact(exactMatch || filteredData[0]);
       setIsNewTransfer(false);
       setStep("amount");
     } catch (error: any) {
-      console.error('Error in handleSearchUser:', error);
+      console.error('Error in handleSearchAccount:', error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao buscar o usuário: " + error.message,
+        description: "Ocorreu um erro ao buscar a conta: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -379,7 +336,7 @@ const Transfer = () => {
       // Mostrar toast de sucesso
       toast({
         title: "Transferência realizada",
-        description: `Você transferiu ${amount} para ${selectedContact.username}`,
+        description: `Você transferiu ${amount} para ${selectedContact.full_name}`,
       });
     } catch (error: any) {
       console.error('Error processing transfer:', error);
@@ -430,11 +387,16 @@ const Transfer = () => {
               <Search className="absolute left-3 top-3 h-4 w-4 text-nox-textSecondary" />
               <Input 
                 className="pl-10 bg-nox-card text-white border-zinc-700"
-                placeholder="Buscar contato"
+                placeholder="Buscar por número de conta"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <p className="text-xs text-nox-textSecondary mt-1">
+                Exemplo: NOX-12345-67890
+              </p>
             </div>
+            
+            <AccountDisplay label="Seu número de conta" className="mt-4" />
             
             <div className="space-y-4">
               {(searchTerm && filteredAllUsers.length > 0) && (
@@ -458,7 +420,7 @@ const Transfer = () => {
                         </Avatar>
                         <div>
                           <p className="text-white font-medium">{contact.full_name}</p>
-                          <p className="text-nox-textSecondary text-sm">{contact.username} • {contact.account_number}</p>
+                          <p className="text-nox-textSecondary text-sm">{contact.account_number}</p>
                         </div>
                       </div>
                       <ArrowRight className="h-5 w-5 text-nox-textSecondary" />
@@ -488,7 +450,7 @@ const Transfer = () => {
                         </Avatar>
                         <div>
                           <p className="text-white font-medium">{contact.full_name}</p>
-                          <p className="text-nox-textSecondary text-sm">{contact.username} • {contact.account_number}</p>
+                          <p className="text-nox-textSecondary text-sm">{contact.account_number}</p>
                         </div>
                       </div>
                       <ArrowRight className="h-5 w-5 text-nox-textSecondary" />
@@ -529,7 +491,7 @@ const Transfer = () => {
                 </Avatar>
                 <div>
                   <p className="text-white font-medium">{selectedContact?.full_name}</p>
-                  <p className="text-nox-textSecondary text-sm">{selectedContact?.username} • {selectedContact?.account_number}</p>
+                  <p className="text-nox-textSecondary text-sm">{selectedContact?.account_number}</p>
                 </div>
               </div>
             </div>
@@ -578,7 +540,7 @@ const Transfer = () => {
                   </Avatar>
                   <div>
                     <p className="text-white font-medium">{selectedContact.full_name}</p>
-                    <p className="text-nox-textSecondary text-sm">{selectedContact.username} • {selectedContact.account_number}</p>
+                    <p className="text-nox-textSecondary text-sm">{selectedContact.account_number}</p>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-zinc-800">
@@ -591,18 +553,17 @@ const Transfer = () => {
                 <h3 className="text-lg font-medium text-white">Nova transferência</h3>
                 
                 <div className="space-y-2">
-                  <label className="text-nox-textSecondary text-sm">Nome de usuário</label>
+                  <label className="text-nox-textSecondary text-sm">Número da conta</label>
                   <div className="relative flex">
                     <Input 
-                      className="pl-6 bg-nox-background text-white border-zinc-700 flex-1"
-                      value={newContactData.username}
-                      onChange={(e) => setNewContactData({...newContactData, username: e.target.value})}
-                      placeholder="username"
+                      className="bg-nox-background text-white border-zinc-700 flex-1"
+                      value={newContactData.accountNumber}
+                      onChange={(e) => setNewContactData({...newContactData, accountNumber: e.target.value})}
+                      placeholder="NOX-12345-67890"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-nox-textSecondary">@</span>
                     <Button
                       className="ml-2 bg-nox-primary"
-                      onClick={handleSearchUser}
+                      onClick={handleSearchAccount}
                       disabled={isSearching}
                     >
                       {isSearching ? (
@@ -684,15 +645,10 @@ const Transfer = () => {
                 </div>
                 
                 <div className="flex justify-between mt-2">
-                  <p className="text-nox-textSecondary">Usuário</p>
-                  <p className="text-white">
-                    {selectedContact?.username}
-                  </p>
-                </div>
-                
-                <div className="flex justify-between mt-2">
                   <p className="text-nox-textSecondary">Conta</p>
-                  <p className="text-white">{selectedContact?.account_number}</p>
+                  <p className="text-white">
+                    {selectedContact?.account_number}
+                  </p>
                 </div>
                 
                 {description && (

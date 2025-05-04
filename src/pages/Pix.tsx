@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -15,11 +14,11 @@ const Pix = () => {
   const { user, profile, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<"receive" | "send">("receive");
   const [amount, setAmount] = useState("");
-  const [pixKey, setPixKey] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [step, setStep] = useState<"key" | "amount" | "confirm" | "success">("key");
+  const [step, setStep] = useState<"account" | "amount" | "confirm" | "success">("account");
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const { toast } = useToast(); // Extracting toast function from useToast hook
+  const { toast } = useToast();
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Format as currency
@@ -51,11 +50,11 @@ const Pix = () => {
     );
   };
 
-  const handlePixKeySearch = async () => {
-    if (!pixKey) {
+  const handleAccountSearch = async () => {
+    if (!accountNumber) {
       toast({
-        title: "Chave inválida",
-        description: "Por favor, insira uma chave Pix válida",
+        title: "Número de conta inválido",
+        description: "Por favor, insira um número de conta válido",
         variant: "destructive",
       });
       return;
@@ -64,65 +63,35 @@ const Pix = () => {
     try {
       setIsProcessing(true);
       
-      // Remove @ from beginning if present
-      const searchKey = pixKey.startsWith('@') ? pixKey.substring(1) : pixKey;
+      // Clean up the account number (remove spaces and dashes if present)
+      const cleanAccountNumber = accountNumber.replace(/[\s-]/g, "");
       
-      console.log("Searching for user with key:", searchKey);
+      console.log("Searching for user with account number:", cleanAccountNumber);
       
-      // Search for exact username match first (case insensitive)
-      const { data: exactData, error: exactError } = await supabase
+      // Search for exact account number match (case insensitive)
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('username', searchKey)
+        .ilike('account_number', `%${cleanAccountNumber}%`)
         .limit(10);
 
-      if (exactError) {
-        throw exactError;
+      if (error) {
+        console.error('Error searching account:', error);
+        throw error;
       }
 
-      if (!exactData || exactData.length === 0) {
-        // If no exact match, try a broader search
-        const { data: fuzzyData, error: fuzzyError } = await supabase
-          .from('profiles')
-          .select('*')
-          .ilike('username', `%${searchKey}%`)
-          .limit(10);
-          
-        if (fuzzyError) {
-          throw fuzzyError;
-        }
-        
-        if (!fuzzyData || fuzzyData.length === 0) {
-          toast({
-            title: "Usuário não encontrado",
-            description: "Nenhum usuário encontrado com esta chave Pix",
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-          return;
-        }
-        
-        // Use fuzzy search results
-        const filteredData = fuzzyData.filter(u => u.id !== user?.id);
-        
-        if (filteredData.length === 0) {
-          toast({
-            title: "Operação inválida",
-            description: "Você não pode enviar um Pix para si mesmo",
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-          return;
-        }
-        
-        setSelectedUser(filteredData[0]);
-        setStep("amount");
+      if (!data || data.length === 0) {
+        toast({
+          title: "Conta não encontrada",
+          description: "Nenhuma conta encontrada com este número",
+          variant: "destructive",
+        });
         setIsProcessing(false);
         return;
       }
-
+      
       // Verify if any of the found users is the user themselves
-      const filteredData = exactData.filter(u => u.id !== user?.id);
+      const filteredData = data.filter(u => u.id !== user?.id);
       
       if (filteredData.length === 0) {
         toast({
@@ -134,15 +103,18 @@ const Pix = () => {
         return;
       }
       
-      // Select the most relevant user (exact match first)
-      const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchKey.toLowerCase());
+      // Select the exact match if possible
+      const exactMatch = filteredData.find(u => 
+        u.account_number.replace(/[\s-]/g, "").toLowerCase() === cleanAccountNumber.toLowerCase()
+      );
+      
       setSelectedUser(exactMatch || filteredData[0]);
       setStep("amount");
     } catch (error: any) {
-      console.error('Error searching for Pix key:', error);
+      console.error('Error searching for account number:', error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao buscar a chave Pix: " + error.message,
+        description: "Ocorreu um erro ao buscar a conta: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -190,7 +162,7 @@ const Pix = () => {
           receiver_id: selectedUser.id,
           amount: parsedAmount,
           transaction_type: 'pix',
-          description: `Pix para ${selectedUser.username}`
+          description: `Pix para ${selectedUser.full_name}`
         }
       );
 
@@ -204,7 +176,7 @@ const Pix = () => {
       // Mostrar toast de sucesso
       toast({
         title: "Pix enviado",
-        description: `Você enviou ${amount} para ${selectedUser.username}`,
+        description: `Você enviou ${amount} para ${selectedUser.full_name}`,
       });
       
       setStep("success");
@@ -223,22 +195,22 @@ const Pix = () => {
 
   const renderSendContent = () => {
     switch (step) {
-      case "key":
+      case "account":
         return (
           <div className="space-y-6">
             <div className="bg-nox-card p-5 rounded-xl">
-              <h3 className="text-lg font-medium text-white mb-4">Digite a chave Pix</h3>
+              <h3 className="text-lg font-medium text-white mb-4">Digite o número da conta</h3>
               
               <div className="space-y-4">
                 <Input
-                  value={pixKey}
-                  onChange={(e) => setPixKey(e.target.value)}
-                  placeholder="@username"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder="NOX-XXXXX-XXXXX"
                   className="bg-nox-background text-white border-zinc-700"
                 />
                 
                 <Button
-                  onClick={handlePixKeySearch}
+                  onClick={handleAccountSearch}
                   className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white"
                   disabled={isProcessing}
                 >
@@ -248,10 +220,20 @@ const Pix = () => {
             </div>
             
             <div className="bg-nox-card p-5 rounded-xl">
-              <h3 className="text-lg font-medium text-white mb-4">Chaves Pix recentes</h3>
+              <h3 className="text-lg font-medium text-white mb-4">Seu número de conta</h3>
               
-              <p className="text-nox-textSecondary">
-                Suas chaves Pix recentes aparecerão aqui para facilitar transações futuras.
+              <div className="bg-nox-background p-4 rounded-lg flex items-center justify-between">
+                <p className="text-white">{profile?.account_number}</p>
+                <button 
+                  className="p-2 rounded-full hover:bg-nox-card"
+                  onClick={() => profile && copyToClipboard(profile.account_number)}
+                >
+                  <Copy className="h-4 w-4 text-nox-textSecondary" />
+                </button>
+              </div>
+              
+              <p className="text-nox-textSecondary mt-3 text-sm">
+                Você pode compartilhar este número de conta para receber transferências e pagamentos.
               </p>
             </div>
           </div>
@@ -267,7 +249,7 @@ const Pix = () => {
                 </div>
                 <div>
                   <p className="text-white font-medium">{selectedUser?.full_name}</p>
-                  <p className="text-nox-textSecondary text-sm">{selectedUser?.username} • {selectedUser?.account_number}</p>
+                  <p className="text-nox-textSecondary text-sm">{selectedUser?.account_number}</p>
                 </div>
               </div>
               
@@ -321,9 +303,9 @@ const Pix = () => {
                 </div>
                 
                 <div className="flex justify-between mt-2">
-                  <p className="text-nox-textSecondary">Chave Pix</p>
+                  <p className="text-nox-textSecondary">Número da conta</p>
                   <p className="text-white">
-                    {selectedUser?.username}
+                    {selectedUser?.account_number}
                   </p>
                 </div>
                 
@@ -404,11 +386,11 @@ const Pix = () => {
           <button 
             className="p-2 rounded-full bg-nox-card mr-3"
             onClick={() => {
-              if (activeTab === "send" && step !== "key") {
+              if (activeTab === "send" && step !== "account") {
                 if (step === "success") {
                   navigate('/home');
                 } else {
-                  setStep("key");
+                  setStep("account");
                 }
               } else {
                 navigate('/home');
@@ -429,7 +411,7 @@ const Pix = () => {
           value={activeTab} 
           onValueChange={(value) => {
             setActiveTab(value as "receive" | "send");
-            setStep("key");
+            setStep("account");
           }}
           className="w-full"
         >
@@ -440,13 +422,13 @@ const Pix = () => {
           
           <TabsContent value="receive" className="space-y-6">
             <div className="bg-nox-card p-5 rounded-xl space-y-6">
-              <h3 className="text-lg font-medium text-white mb-4">Chave Pix</h3>
+              <h3 className="text-lg font-medium text-white mb-4">Número da Conta</h3>
               
               <div className="bg-nox-background p-4 rounded-lg flex items-center justify-between">
-                <p className="text-white">{profile?.username}</p>
+                <p className="text-white">{profile?.account_number}</p>
                 <button 
                   className="p-2 rounded-full hover:bg-nox-card"
-                  onClick={() => profile && copyToClipboard(profile.username)}
+                  onClick={() => profile && copyToClipboard(profile.account_number)}
                 >
                   <Copy className="h-4 w-4 text-nox-textSecondary" />
                 </button>
@@ -455,10 +437,10 @@ const Pix = () => {
               <Button 
                 variant="outline" 
                 className="w-full border border-zinc-700 text-white"
-                onClick={() => profile && copyToClipboard(profile.username)}
+                onClick={() => profile && copyToClipboard(profile.account_number)}
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Copiar chave
+                Copiar número da conta
               </Button>
             </div>
             

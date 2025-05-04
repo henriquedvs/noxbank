@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle, AlertCircle } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
@@ -9,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import AccountDisplay from "@/components/account-display";
 
 const Payment = () => {
   const { toast } = useToast();
@@ -26,7 +26,7 @@ const Payment = () => {
   } | null>(null);
   
   // User payment related states
-  const [searchTerm, setSearchTerm] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [amount, setAmount] = useState("");
@@ -68,12 +68,12 @@ const Payment = () => {
     }, 1000);
   };
 
-  // Search for users by username
+  // Search for users by account number
   const handleSearch = async () => {
-    if (!searchTerm.trim()) {
+    if (!accountNumber.trim()) {
       toast({
         title: "Campo vazio",
-        description: "Digite um nome de usuário para buscar.",
+        description: "Digite um número de conta para buscar.",
         variant: "destructive"
       });
       return;
@@ -82,76 +82,56 @@ const Payment = () => {
     setIsSearching(true);
     
     try {
-      // Clean up the search term (remove @ if present)
-      const cleanSearchTerm = searchTerm.startsWith('@') 
-        ? searchTerm.substring(1).toLowerCase() 
-        : searchTerm.toLowerCase();
+      // Clean up the account number (remove spaces and dashes if present)
+      const cleanAccountNumber = accountNumber.replace(/[\s-]/g, "");
       
-      console.log("Searching for username:", cleanSearchTerm);
+      console.log("Searching for account number:", cleanAccountNumber);
       
-      // First try exact match
-      const { data: exactData, error: exactError } = await supabase
+      // Search for account number
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('username', cleanSearchTerm);
+        .ilike('account_number', `%${cleanAccountNumber}%`);
       
-      if (exactError) {
-        console.error("Error searching users (exact):", exactError);
-        throw exactError;
+      if (error) {
+        console.error("Error searching account number:", error);
+        throw error;
       }
       
       // Filter out current user from results
-      let filteredResults = [];
+      const filteredResults = data?.filter(u => u.id !== user?.id) || [];
       
-      if (exactData && exactData.length > 0) {
-        filteredResults = exactData.filter(u => u.id !== user?.id);
-        
-        if (filteredResults.length > 0) {
-          console.log("Found users with exact match:", filteredResults);
-          setSearchResults(filteredResults);
-          setIsSearching(false);
-          return;
-        }
+      console.log("Search results:", filteredResults);
+      
+      if (filteredResults.length === 0) {
+        toast({
+          title: "Conta não encontrada",
+          description: "Não foi possível encontrar uma conta com este número.",
+          variant: "destructive"
+        });
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
       }
       
-      // If no exact match, try fuzzy search
-      const { data: fuzzyData, error: fuzzyError } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, account_number, avatar_url')
-        .ilike('username', `%${cleanSearchTerm}%`)
-        .order('username')
-        .limit(5);
+      // Try to find exact match
+      const exactMatch = filteredResults.find(u => 
+        u.account_number.replace(/[\s-]/g, "").toLowerCase() === cleanAccountNumber.toLowerCase()
+      );
       
-      if (fuzzyError) {
-        console.error("Error searching users (fuzzy):", fuzzyError);
-        throw fuzzyError;
+      if (exactMatch) {
+        console.log("Exact match found:", exactMatch);
+        setSearchResults([exactMatch]);
+      } else {
+        console.log("No exact match, using partial matches");
+        setSearchResults(filteredResults);
       }
-      
-      // Filter out current user from results
-      if (fuzzyData && fuzzyData.length > 0) {
-        filteredResults = fuzzyData.filter(u => u.id !== user?.id);
-        
-        if (filteredResults.length > 0) {
-          console.log("Found users with fuzzy match:", filteredResults);
-          setSearchResults(filteredResults);
-          setIsSearching(false);
-          return;
-        }
-      }
-      
-      // No users found
-      toast({
-        title: "Usuário não encontrado",
-        description: "Não foi possível encontrar um usuário com este nome.",
-        variant: "destructive"
-      });
-      setSearchResults([]);
       
     } catch (error: any) {
       console.error("Search error:", error);
       toast({
         title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar usuários. Tente novamente.",
+        description: "Ocorreu um erro ao buscar a conta. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -211,7 +191,7 @@ const Payment = () => {
           receiver_id: selectedUser.id,
           amount: parsedAmount,
           transaction_type: 'payment',
-          description: `Pagamento para ${selectedUser.username}`
+          description: `Pagamento para ${selectedUser.full_name}`
         }
       );
       
@@ -225,7 +205,7 @@ const Payment = () => {
       // Success!
       toast({
         title: "Pagamento realizado",
-        description: `Você enviou ${amount} para ${selectedUser.username} com sucesso!`
+        description: `Você enviou ${amount} para ${selectedUser.full_name} com sucesso!`
       });
       
       setStep("success");
@@ -319,7 +299,7 @@ const Payment = () => {
               </div>
               <div>
                 <h4 className="text-white font-medium">Pagar para usuário</h4>
-                <p className="text-sm text-nox-textSecondary">Busque por @username</p>
+                <p className="text-sm text-nox-textSecondary">Busque pelo número da conta</p>
               </div>
             </div>
             <Button
@@ -330,6 +310,9 @@ const Payment = () => {
               <ArrowDown className="h-5 w-5" />
             </Button>
           </div>
+          
+          {/* Account Number Display */}
+          <AccountDisplay />
           
           {/* Bill Details */}
           {billDetails && (
@@ -417,12 +400,11 @@ const Payment = () => {
           <div className="space-y-4">
             <div className="relative">
               <div className="flex">
-                <div className="absolute left-3 top-3 text-nox-textSecondary">@</div>
                 <Input
-                  className="pl-8 bg-nox-card text-white border-zinc-700"
-                  placeholder="username"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-nox-card text-white border-zinc-700"
+                  placeholder="Digite o número da conta"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
                 />
                 <Button
                   onClick={handleSearch}
@@ -436,11 +418,14 @@ const Payment = () => {
                   )}
                 </Button>
               </div>
+              <p className="text-sm text-nox-textSecondary mt-1">
+                Exemplo: NOX-12345-67890
+              </p>
             </div>
             
             {searchResults.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-white font-medium">Usuários encontrados</h4>
+                <h4 className="text-white font-medium">Contas encontradas</h4>
                 
                 {searchResults.map((result) => (
                   <div 
@@ -460,7 +445,7 @@ const Payment = () => {
                       </Avatar>
                       <div>
                         <p className="text-white font-medium">{result.full_name}</p>
-                        <p className="text-nox-textSecondary text-sm">{result.username}</p>
+                        <p className="text-nox-textSecondary text-sm">{result.account_number}</p>
                       </div>
                     </div>
                     <ArrowDown className="h-5 w-5 text-nox-textSecondary" />
@@ -497,7 +482,7 @@ const Payment = () => {
               </Avatar>
               <div>
                 <p className="text-white font-medium">{selectedUser?.full_name}</p>
-                <p className="text-nox-textSecondary text-sm">{selectedUser?.username}</p>
+                <p className="text-nox-textSecondary text-sm">{selectedUser?.account_number}</p>
               </div>
             </div>
           </div>
@@ -560,9 +545,9 @@ const Payment = () => {
               </div>
               
               <div className="flex justify-between mt-2">
-                <p className="text-nox-textSecondary">Usuário</p>
+                <p className="text-nox-textSecondary">Conta</p>
                 <p className="text-white">
-                  {selectedUser?.username}
+                  {selectedUser?.account_number}
                 </p>
               </div>
               
@@ -640,7 +625,7 @@ const Payment = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-white">
-              {step === "search" ? "Buscar usuário" : 
+              {step === "search" ? "Buscar conta" : 
                step === "amount" ? "Valor do pagamento" : 
                step === "confirm" ? "Confirmar pagamento" : 
                step === "success" ? "Pagamento concluído" : "Pagamento"}
