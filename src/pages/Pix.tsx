@@ -64,31 +64,65 @@ const Pix = () => {
     try {
       setIsProcessing(true);
       
-      // In this prototype, we'll use the username as Pix key
       // Remove @ from beginning if present
       const searchKey = pixKey.startsWith('@') ? pixKey.substring(1) : pixKey;
       
-      const { data, error } = await supabase
+      console.log("Searching for user with key:", searchKey);
+      
+      // Search for exact username match first (case insensitive)
+      const { data: exactData, error: exactError } = await supabase
         .from('profiles')
         .select('*')
         .ilike('username', searchKey)
         .limit(10);
 
-      if (error) {
-        throw error;
+      if (exactError) {
+        throw exactError;
       }
 
-      if (!data || data.length === 0) {
-        toast({
-          title: "Usuário não encontrado",
-          description: "Nenhum usuário encontrado com esta chave Pix",
-          variant: "destructive",
-        });
+      if (!exactData || exactData.length === 0) {
+        // If no exact match, try a broader search
+        const { data: fuzzyData, error: fuzzyError } = await supabase
+          .from('profiles')
+          .select('*')
+          .ilike('username', `%${searchKey}%`)
+          .limit(10);
+          
+        if (fuzzyError) {
+          throw fuzzyError;
+        }
+        
+        if (!fuzzyData || fuzzyData.length === 0) {
+          toast({
+            title: "Usuário não encontrado",
+            description: "Nenhum usuário encontrado com esta chave Pix",
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        }
+        
+        // Use fuzzy search results
+        const filteredData = fuzzyData.filter(u => u.id !== user?.id);
+        
+        if (filteredData.length === 0) {
+          toast({
+            title: "Operação inválida",
+            description: "Você não pode enviar um Pix para si mesmo",
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        }
+        
+        setSelectedUser(filteredData[0]);
+        setStep("amount");
+        setIsProcessing(false);
         return;
       }
 
-      // Verificar se algum dos usuários encontrados é o próprio usuário
-      const filteredData = data.filter(u => u.id !== user?.id);
+      // Verify if any of the found users is the user themselves
+      const filteredData = exactData.filter(u => u.id !== user?.id);
       
       if (filteredData.length === 0) {
         toast({
@@ -96,10 +130,11 @@ const Pix = () => {
           description: "Você não pode enviar um Pix para si mesmo",
           variant: "destructive",
         });
+        setIsProcessing(false);
         return;
       }
       
-      // Selecionando o usuário mais relevante (correspondência exata primeiro)
+      // Select the most relevant user (exact match first)
       const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchKey.toLowerCase());
       setSelectedUser(exactMatch || filteredData[0]);
       setStep("amount");
@@ -107,7 +142,7 @@ const Pix = () => {
       console.error('Error searching for Pix key:', error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao buscar a chave Pix",
+        description: "Ocorreu um erro ao buscar a chave Pix: " + error.message,
         variant: "destructive",
       });
     } finally {

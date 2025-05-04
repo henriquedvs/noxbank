@@ -43,6 +43,7 @@ const Transfer = () => {
       if (!user) return;
       
       try {
+        console.log("Fetching all users");
         // Fetch all users except current user
         const { data, error } = await supabase
           .from('profiles')
@@ -59,6 +60,7 @@ const Transfer = () => {
           contact && contact.username && contact.full_name
         );
         
+        console.log("All users fetched:", validUsers.length);
         setAllUsers(validUsers);
 
         // Fetch recent contacts (users that the current user has transferred money to)
@@ -91,6 +93,7 @@ const Transfer = () => {
             return acc;
           }, [] as Contact[]);
 
+        console.log("Recent contacts fetched:", uniqueReceivers.length);
         setRecentContacts(uniqueReceivers);
       } catch (error) {
         console.error('Error in fetchUsers:', error);
@@ -116,6 +119,8 @@ const Transfer = () => {
           return contact.username.toLowerCase().includes(cleanSearchTerm) ||
                  contact.full_name.toLowerCase().includes(cleanSearchTerm);
         });
+        
+        console.log("Filtered users by search term:", filteredUsers.length);
         
         // Ordenando para priorizar correspondências exatas do username
         setAllUsers(prevUsers => {
@@ -152,6 +157,8 @@ const Transfer = () => {
   const filteredContacts = recentContacts.filter(contact => {
     if (!contact || !contact.username || !contact.full_name) return false;
     
+    if (!searchTerm) return true; // If no search term, show all recent contacts
+    
     const cleanSearchTerm = searchTerm.startsWith('@') 
       ? searchTerm.substring(1).toLowerCase() 
       : searchTerm.toLowerCase();
@@ -175,6 +182,7 @@ const Transfer = () => {
     : [];
 
   const handleContactSelect = (contact: Contact) => {
+    console.log("Selected contact:", contact);
     setSelectedContact(contact);
     setStep("amount");
   };
@@ -190,6 +198,7 @@ const Transfer = () => {
     }
 
     setIsSearching(true);
+    console.log("Searching for user:", newContactData.username);
     
     try {
       // Formatando o username corretamente para busca
@@ -197,34 +206,80 @@ const Transfer = () => {
       if (searchUsername.startsWith('@')) {
         searchUsername = searchUsername.substring(1);
       }
+      
+      console.log("Cleaned search username:", searchUsername);
         
-      // Search for the user in Supabase
+      // Search for the user in Supabase - first try exact match
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('username', `%${searchUsername}%`)
+        .ilike('username', searchUsername)
         .limit(10);
 
       if (error) {
         console.error('Error searching for user:', error);
         toast({
           title: "Erro",
-          description: "Ocorreu um erro ao buscar o usuário",
+          description: "Ocorreu um erro ao buscar o usuário: " + error.message,
           variant: "destructive",
         });
+        setIsSearching(false);
         return;
       }
 
+      // If no exact match, try fuzzy search
       if (!data || data.length === 0) {
-        toast({
-          title: "Usuário não encontrado",
-          description: "Não foi possível encontrar um usuário com este nome",
-          variant: "destructive",
-        });
+        console.log("No exact match, trying fuzzy search");
+        const { data: fuzzyData, error: fuzzyError } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, account_number, avatar_url')
+          .ilike('username', `%${searchUsername}%`)
+          .limit(10);
+          
+        if (fuzzyError) {
+          console.error('Error in fuzzy search:', fuzzyError);
+          toast({
+            title: "Erro",
+            description: "Ocorreu um erro na busca de usuário: " + fuzzyError.message,
+            variant: "destructive",
+          });
+          setIsSearching(false);
+          return;
+        }
+        
+        if (!fuzzyData || fuzzyData.length === 0) {
+          console.log("No user found with fuzzy search either");
+          toast({
+            title: "Usuário não encontrado",
+            description: "Não foi possível encontrar um usuário com este nome",
+            variant: "destructive",
+          });
+          setIsSearching(false);
+          return;
+        }
+        
+        // Check if any of the users found is the user themselves
+        const filteredFuzzyData = fuzzyData.filter(u => u.id !== user?.id);
+        
+        if (filteredFuzzyData.length === 0) {
+          toast({
+            title: "Erro",
+            description: "Você não pode transferir para sua própria conta",
+            variant: "destructive",
+          });
+          setIsSearching(false);
+          return;
+        }
+        
+        console.log("User found with fuzzy search:", filteredFuzzyData[0]);
+        setSelectedContact(filteredFuzzyData[0]);
+        setIsNewTransfer(false);
+        setStep("amount");
+        setIsSearching(false);
         return;
       }
 
-      // Verificar se algum dos usuários encontrados é o próprio usuário
+      // Verify if any of the found users is the user themselves
       const filteredData = data.filter(u => u.id !== user?.id);
       
       if (filteredData.length === 0) {
@@ -233,19 +288,21 @@ const Transfer = () => {
           description: "Você não pode transferir para sua própria conta",
           variant: "destructive",
         });
+        setIsSearching(false);
         return;
       }
 
-      // Selecionando o usuário mais relevante (correspondência exata primeiro)
+      // Selecting the most relevant user (exact match first)
+      console.log("User found with exact search:", filteredData[0]);
       const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchUsername.toLowerCase());
       setSelectedContact(exactMatch || filteredData[0]);
       setIsNewTransfer(false);
       setStep("amount");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in handleSearchUser:', error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao buscar o usuário",
+        description: "Ocorreu um erro ao buscar o usuário: " + error.message,
         variant: "destructive",
       });
     } finally {
