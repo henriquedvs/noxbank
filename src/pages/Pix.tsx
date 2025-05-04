@@ -19,6 +19,7 @@ const Pix = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<"key" | "amount" | "confirm" | "success">("key");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const { toast } = useToast(); // Extracting toast function from useToast hook
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Format as currency
