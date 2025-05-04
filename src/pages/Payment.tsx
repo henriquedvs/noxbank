@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle, AlertCircle } from "lucide-react";
+
+import { useState, useEffect } from "react";
+import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AccountDisplay from "@/components/account-display";
+import { cleanAccountNumber, prepareAccountNumberForSearch } from "@/utils/accountUtils";
 
 const Payment = () => {
   const { toast } = useToast();
@@ -82,16 +84,15 @@ const Payment = () => {
     setIsSearching(true);
     
     try {
-      // Clean up the account number (remove spaces and dashes if present)
-      const cleanAccountNumber = accountNumber.replace(/[\s-]/g, "");
+      // Clean up and prepare the account number for search
+      const cleanedAccountNumber = cleanAccountNumber(accountNumber);
+      console.log("Searching for account number:", cleanedAccountNumber);
       
-      console.log("Searching for account number:", cleanAccountNumber);
-      
-      // Search for account number
+      // Search with a broader query to improve chances of finding a match
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('account_number', `%${cleanAccountNumber}%`);
+        .filter('account_number', 'ilike', prepareAccountNumberForSearch(accountNumber));
       
       if (error) {
         console.error("Error searching account number:", error);
@@ -114,9 +115,9 @@ const Payment = () => {
         return;
       }
       
-      // Try to find exact match
+      // Try to find exact match by comparing cleaned account numbers
       const exactMatch = filteredResults.find(u => 
-        u.account_number.replace(/[\s-]/g, "").toLowerCase() === cleanAccountNumber.toLowerCase()
+        cleanAccountNumber(u.account_number) === cleanedAccountNumber
       );
       
       if (exactMatch) {

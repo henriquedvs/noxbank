@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { cleanAccountNumber, prepareAccountNumberForSearch } from "@/utils/accountUtils";
 
 const Pix = () => {
   const navigate = useNavigate();
@@ -63,16 +65,15 @@ const Pix = () => {
     try {
       setIsProcessing(true);
       
-      // Clean up the account number (remove spaces and dashes if present)
-      const cleanAccountNumber = accountNumber.replace(/[\s-]/g, "");
+      // Clean up and prepare the account number for search
+      const cleanedAccountNumber = cleanAccountNumber(accountNumber);
+      console.log("Searching for user with account number:", cleanedAccountNumber);
       
-      console.log("Searching for user with account number:", cleanAccountNumber);
-      
-      // Search for exact account number match (case insensitive)
+      // Use improved search query
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('account_number', `%${cleanAccountNumber}%`)
+        .filter('account_number', 'ilike', prepareAccountNumberForSearch(accountNumber))
         .limit(10);
 
       if (error) {
@@ -103,9 +104,9 @@ const Pix = () => {
         return;
       }
       
-      // Select the exact match if possible
+      // Select the exact match if possible by comparing cleaned account numbers
       const exactMatch = filteredData.find(u => 
-        u.account_number.replace(/[\s-]/g, "").toLowerCase() === cleanAccountNumber.toLowerCase()
+        cleanAccountNumber(u.account_number) === cleanedAccountNumber
       );
       
       setSelectedUser(exactMatch || filteredData[0]);
