@@ -100,17 +100,24 @@ const Transfer = () => {
     fetchUsers();
   }, [user]);
 
-  // Melhorando a busca para ser mais responsiva
+  // Melhorando a busca para ser mais responsiva e lidar melhor com @username
   useEffect(() => {
     if (searchTerm && searchTerm.length >= 2) {
       const delaySearch = setTimeout(() => {
-        // Only filter valid contacts
-        const filtered = allUsers.filter(contact => 
-          contact && contact.username && contact.full_name &&
-          (contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
+        // Filtrando usuários com usernames válidos 
+        const filteredUsers = allUsers.filter(contact => {
+          if (!contact || !contact.username || !contact.full_name) return false;
+          
+          // Removendo o @ do searchTerm se existir para a comparação
+          const cleanSearchTerm = searchTerm.startsWith('@') 
+            ? searchTerm.substring(1).toLowerCase() 
+            : searchTerm.toLowerCase();
+            
+          return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+                 contact.full_name.toLowerCase().includes(cleanSearchTerm);
+        });
         
+        // Ordenando para priorizar correspondências exatas do username
         setAllUsers(prevUsers => {
           // Filter out invalid users first
           const validUsers = prevUsers.filter(user => user && user.username);
@@ -120,8 +127,18 @@ const Transfer = () => {
             if (!a || !a.username) return 1;
             if (!b || !b.username) return -1;
             
-            const aMatch = a.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
-            const bMatch = b.username.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
+            // Removendo o @ do searchTerm se existir para a comparação
+            const cleanSearchTerm = searchTerm.startsWith('@') 
+              ? searchTerm.substring(1).toLowerCase() 
+              : searchTerm.toLowerCase();
+              
+            // Priorizando correspondências exatas de username
+            if (a.username.toLowerCase() === cleanSearchTerm) return -1;
+            if (b.username.toLowerCase() === cleanSearchTerm) return 1;
+            
+            // Em seguida, por correspondência parcial
+            const aMatch = a.username.toLowerCase().includes(cleanSearchTerm) ? 1 : 0;
+            const bMatch = b.username.toLowerCase().includes(cleanSearchTerm) ? 1 : 0;
             return bMatch - aMatch;
           });
         });
@@ -131,20 +148,30 @@ const Transfer = () => {
     }
   }, [searchTerm]);
 
-  const filteredContacts = recentContacts.filter(contact => 
-    contact && contact.username && contact.full_name && (
-      contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Filtrando contatos recentes com tratamento de nulos e suporte para @username
+  const filteredContacts = recentContacts.filter(contact => {
+    if (!contact || !contact.username || !contact.full_name) return false;
+    
+    const cleanSearchTerm = searchTerm.startsWith('@') 
+      ? searchTerm.substring(1).toLowerCase() 
+      : searchTerm.toLowerCase();
+      
+    return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+           contact.full_name.toLowerCase().includes(cleanSearchTerm);
+  });
 
+  // Filtrando todos os usuários com tratamento de nulos e suporte para @username
   const filteredAllUsers = searchTerm && searchTerm.length >= 2
-    ? allUsers.filter(contact => 
-        contact && contact.username && contact.full_name && (
-          contact.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          contact.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      )
+    ? allUsers.filter(contact => {
+        if (!contact || !contact.username || !contact.full_name) return false;
+        
+        const cleanSearchTerm = searchTerm.startsWith('@') 
+          ? searchTerm.substring(1).toLowerCase() 
+          : searchTerm.toLowerCase();
+          
+        return contact.username.toLowerCase().includes(cleanSearchTerm) ||
+               contact.full_name.toLowerCase().includes(cleanSearchTerm);
+      })
     : [];
 
   const handleContactSelect = (contact: Contact) => {
@@ -291,6 +318,12 @@ const Transfer = () => {
       await refreshProfile();
       
       setStep("success");
+      
+      // Mostrar toast de sucesso
+      toast({
+        title: "Transferência realizada",
+        description: `Você transferiu ${amount} para ${selectedContact.username}`,
+      });
     } catch (error: any) {
       console.error('Error processing transfer:', error);
       
@@ -322,6 +355,8 @@ const Transfer = () => {
   };
 
   const getInitials = (name: string) => {
+    if (!name) return "??";
+    
     const parts = name.split(' ');
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const Pix = () => {
@@ -70,7 +71,7 @@ const Pix = () => {
         .from('profiles')
         .select('*')
         .ilike('username', searchKey)
-        .limit(1);
+        .limit(10);
 
       if (error) {
         throw error;
@@ -85,7 +86,10 @@ const Pix = () => {
         return;
       }
 
-      if (data[0].id === user?.id) {
+      // Verificar se algum dos usuários encontrados é o próprio usuário
+      const filteredData = data.filter(u => u.id !== user?.id);
+      
+      if (filteredData.length === 0) {
         toast({
           title: "Operação inválida",
           description: "Você não pode enviar um Pix para si mesmo",
@@ -93,10 +97,12 @@ const Pix = () => {
         });
         return;
       }
-
-      setSelectedUser(data[0]);
+      
+      // Selecionando o usuário mais relevante (correspondência exata primeiro)
+      const exactMatch = filteredData.find(u => u.username.toLowerCase() === searchKey.toLowerCase());
+      setSelectedUser(exactMatch || filteredData[0]);
       setStep("amount");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching for Pix key:', error);
       toast({
         title: "Erro",
@@ -158,6 +164,12 @@ const Pix = () => {
 
       // Refresh user profile to update balance
       await refreshProfile();
+      
+      // Mostrar toast de sucesso
+      toast({
+        title: "Pix enviado",
+        description: `Você enviou ${amount} para ${selectedUser.username}`,
+      });
       
       setStep("success");
     } catch (error: any) {
