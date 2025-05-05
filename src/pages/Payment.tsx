@@ -89,6 +89,7 @@ const Payment = () => {
       console.log("Searching for account number:", cleanedAccountNumber);
       
       // Search with a broader query to improve chances of finding a match
+      // Using profiles table where account_number is stored
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')

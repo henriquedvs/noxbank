@@ -1,3 +1,4 @@
+
 /**
  * Cleans and formats an account number by removing spaces, dashes, and other non-alphanumeric characters
  * @param accountNumber The account number to clean
@@ -48,4 +49,32 @@ export const prepareAccountNumberForSearch = (accountNumber: string): string => 
   
   // If it doesn't include NOX prefix, add it
   return `%NOX${cleaned}%`;
+};
+
+/**
+ * Normalizes search query for more effective database matching
+ * @param searchTerm The term to normalize
+ * @returns Normalized search term for database query
+ */
+export const normalizeSearchTerm = (searchTerm: string): string => {
+  // Remove common separators and format consistently
+  return `%${searchTerm.replace(/[\s-_]/g, "")}%`.toUpperCase();
+};
+
+/**
+ * Improved account number search function for better matching
+ * This can be used for multiple search strategies
+ * @param searchTerm The term to search for
+ * @returns Search term ready for ilike query
+ */
+export const prepareAccountSearch = (searchTerm: string): string => {
+  const cleaned = searchTerm.replace(/[\s-_]/g, "").toUpperCase();
+  
+  // If NOX prefix exists, preserve it in search
+  if (cleaned.includes("NOX")) {
+    return `%${cleaned}%`;
+  }
+  
+  // Try both with and without NOX prefix
+  return cleaned.length > 3 ? `%${cleaned}%` : `%NOX${cleaned}%`;
 };

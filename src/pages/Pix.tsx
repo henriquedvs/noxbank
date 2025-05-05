@@ -69,7 +69,7 @@ const Pix = () => {
       const cleanedAccountNumber = cleanAccountNumber(accountNumber);
       console.log("Searching for user with account number:", cleanedAccountNumber);
       
-      // Use improved search query
+      // Use the public.profiles table where account_number is stored
       const { data, error } = await supabase
         .from('profiles')
         .select('*')

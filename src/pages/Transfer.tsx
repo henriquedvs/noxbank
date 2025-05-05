@@ -44,7 +44,7 @@ const Transfer = () => {
       
       try {
         console.log("Fetching all users");
-        // Fetch all users except current user
+        // Fetch all users except current user from the profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('id, username, full_name, account_number, avatar_url')
@@ -203,11 +203,11 @@ const Transfer = () => {
       
       console.log("Cleaned search account number:", searchAccountNumber);
         
-      // Search for the account in Supabase
+      // Search for the account in profiles table
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, account_number, avatar_url')
-        .ilike('account_number', `%${searchAccountNumber}%`)
+        .ilike('account_number', prepareAccountSearch(searchAccountNumber))
         .limit(10);
 
       if (error) {
@@ -248,7 +248,7 @@ const Transfer = () => {
       
       // Find exact match if possible
       const exactMatch = filteredData.find(u => 
-        u.account_number.replace(/[\s-]/g, "").toLowerCase() === searchAccountNumber.toLowerCase()
+        cleanAccountNumber(u.account_number) === searchAccountNumber.toUpperCase()
       );
       
       console.log("Account found:", exactMatch || filteredData[0]);
