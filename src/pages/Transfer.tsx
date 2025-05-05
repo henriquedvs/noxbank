@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import AccountDisplay from "@/components/account-display";
+import { cleanAccountNumber, prepareAccountSearch } from "@/utils/accountUtils";
 
 interface Contact {
   id: string;
