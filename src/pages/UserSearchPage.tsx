@@ -1,12 +1,14 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const UserSearchPage = () => {
   const navigate = useNavigate();
@@ -21,11 +23,7 @@ const UserSearchPage = () => {
     return params.get("destination") || "/transfer";
   });
 
-  // Fetch all users on component mount
-  useState(() => {
-    loadUsers();
-  });
-
+  // Defining loadUsers function before using it in useEffect
   const loadUsers = async () => {
     if (!user) return;
     
@@ -52,6 +50,11 @@ const UserSearchPage = () => {
       setIsSearching(false);
     }
   };
+
+  // Fetch all users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
   
   // Handle search with debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,7 +148,7 @@ const UserSearchPage = () => {
               <div className="flex items-center">
                 <Avatar className="h-12 w-12 mr-3">
                   {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.full_name} />
+                    <AvatarImage src={user.avatar_url} alt={user.full_name} />
                   ) : (
                     <AvatarFallback className="bg-nox-buttonInactive text-white">
                       {getInitials(user.full_name)}
