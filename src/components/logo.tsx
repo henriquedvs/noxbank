@@ -1,5 +1,6 @@
 
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 interface LogoProps {
   className?: string;
@@ -7,48 +8,28 @@ interface LogoProps {
 }
 
 const Logo = ({ className, animated = false }: LogoProps) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (animated) {
+      const timer = setTimeout(() => setIsLoaded(true), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoaded(true);
+    }
+  }, [animated]);
+
   return (
-    <div className={cn("flex items-center space-x-2", className)}>
-      <div className={cn("h-10 w-10 bg-nox-primary rounded-full flex items-center justify-center", 
-        animated && "animate-logo-pulse")}>
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M4 7L12 3L20 7V17L12 21L4 17V7Z"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M12 12L12 21"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M12 12L20 7"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M12 12L4 7"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
+    <div className={cn("flex items-center justify-center", className)}>
+      <div className={cn("relative", 
+        animated && "transition-all duration-1000 ease-in-out transform",
+        animated && (isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-90"))}>
+        <img 
+          src="/lovable-uploads/06e568a7-047e-420a-89a8-f1b56ecda980.png"
+          alt="Nox Logo"
+          className="h-12 w-auto"
+        />
       </div>
-      <span className="text-xl font-bold">
-        <span className="text-nox-primary">Nox</span>
-        <span className="text-white">Bank</span>
-      </span>
     </div>
   );
 };

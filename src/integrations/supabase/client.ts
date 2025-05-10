@@ -13,8 +13,5 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
     },
-    global: {
-      fetch: (url, init) => fetch(url, init),
-    },
   }
 );

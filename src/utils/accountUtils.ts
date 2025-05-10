@@ -78,3 +78,64 @@ export const prepareAccountSearch = (searchTerm: string): string => {
   // Try both with and without NOX prefix
   return cleaned.length > 3 ? `%${cleaned}%` : `%NOX${cleaned}%`;
 };
+
+/**
+ * Fetches all registered users from the database
+ * @param supabaseClient Supabase client instance
+ * @param currentUserId Current user ID to exclude from results
+ * @returns Promise with user data
+ */
+export const fetchAllUsers = async (supabaseClient: any, currentUserId: string) => {
+  try {
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('id, username, full_name, account_number, avatar_url')
+      .neq('id', currentUserId)
+      .limit(20);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return [];
+  }
+};
+
+/**
+ * Search for users based on account number or name
+ * @param supabaseClient Supabase client instance
+ * @param searchTerm Search term
+ * @param currentUserId Current user ID to exclude from results
+ * @returns Promise with search results
+ */
+export const searchUsers = async (supabaseClient: any, searchTerm: string, currentUserId: string) => {
+  try {
+    if (!searchTerm || searchTerm.trim() === '') {
+      return [];
+    }
+    
+    const cleanedTerm = searchTerm.toLowerCase().trim();
+    const preparedTerm = prepareAccountSearch(cleanedTerm);
+    
+    console.log("Searching for users with term:", preparedTerm);
+    
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('id, username, full_name, account_number, avatar_url')
+      .or(`account_number.ilike.${preparedTerm},full_name.ilike.%${cleanedTerm}%`)
+      .neq('id', currentUserId)
+      .limit(10);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error searching users:", error);
+    return [];
+  }
+};

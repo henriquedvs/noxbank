@@ -24,11 +24,7 @@ const SplashScreen = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-nox-background">
-      <div className={`transition-all duration-1000 ease-in-out transform ${
-        showLogo ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
-      }`}>
-        <Logo animated className="scale-150" />
-      </div>
+      <Logo animated className="scale-150" />
       <p className={`mt-6 text-nox-textSecondary text-sm transition-all duration-1000 delay-500 ${
         showLogo ? 'opacity-100' : 'opacity-0'
       }`}>
