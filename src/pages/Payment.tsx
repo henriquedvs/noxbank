@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AccountDisplay from "@/components/account-display";
 import UserSearch from "@/components/user-search";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Payment = () => {
   const { toast } = useToast();
