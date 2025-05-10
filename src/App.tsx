@@ -17,6 +17,7 @@ import Transfer from "./pages/Transfer";
 import Deposit from "./pages/Deposit";
 import Pix from "./pages/Pix";
 import Payment from "./pages/Payment";
+import UserSearchPage from "./pages/UserSearchPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import ProtectedRoute from "./components/protected-route";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/deposit" element={<ProtectedRoute><Deposit /></ProtectedRoute>} />
               <Route path="/pix" element={<ProtectedRoute><Pix /></ProtectedRoute>} />
               <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
+              <Route path="/search-users" element={<ProtectedRoute><UserSearchPage /></ProtectedRoute>} />
               
               <Route path="/index" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFound />} />

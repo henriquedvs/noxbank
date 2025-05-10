@@ -1,7 +1,6 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Copy, QrCode, User, DollarSign, Share2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import BottomNav from "@/components/bottom-nav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,18 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { cleanAccountNumber, prepareAccountNumberForSearch } from "@/utils/accountUtils";
 
 const Pix = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<"receive" | "send">("receive");
   const [amount, setAmount] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<"account" | "amount" | "confirm" | "success">("account");
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const { toast } = useToast();
+
+  // Handle user selection from search page
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const selectedUserParam = searchParams.get('selectedUser');
+    
+    if (selectedUserParam) {
+      try {
+        const user = JSON.parse(decodeURIComponent(selectedUserParam));
+        setSelectedUser(user);
+        setStep("amount");
+      } catch (error) {
+        console.error("Error parsing selected user:", error);
+      }
+    }
+  }, [location]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Format as currency
@@ -52,75 +66,8 @@ const Pix = () => {
     );
   };
 
-  const handleAccountSearch = async () => {
-    if (!accountNumber) {
-      toast({
-        title: "Número de conta inválido",
-        description: "Por favor, insira um número de conta válido",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-      
-      // Clean up and prepare the account number for search
-      const cleanedAccountNumber = cleanAccountNumber(accountNumber);
-      console.log("Searching for user with account number:", cleanedAccountNumber);
-      
-      // Use the public.profiles table where account_number is stored
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .filter('account_number', 'ilike', prepareAccountNumberForSearch(accountNumber))
-        .limit(10);
-
-      if (error) {
-        console.error('Error searching account:', error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        toast({
-          title: "Conta não encontrada",
-          description: "Nenhuma conta encontrada com este número",
-          variant: "destructive",
-        });
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Verify if any of the found users is the user themselves
-      const filteredData = data.filter(u => u.id !== user?.id);
-      
-      if (filteredData.length === 0) {
-        toast({
-          title: "Operação inválida",
-          description: "Você não pode enviar um Pix para si mesmo",
-          variant: "destructive",
-        });
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Select the exact match if possible by comparing cleaned account numbers
-      const exactMatch = filteredData.find(u => 
-        cleanAccountNumber(u.account_number) === cleanedAccountNumber
-      );
-      
-      setSelectedUser(exactMatch || filteredData[0]);
-      setStep("amount");
-    } catch (error: any) {
-      console.error('Error searching for account number:', error);
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao buscar a conta: " + error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleGoToSearch = () => {
+    navigate("/search-users?destination=/pix");
   };
 
   const handleAmountSubmit = () => {
@@ -200,41 +147,17 @@ const Pix = () => {
         return (
           <div className="space-y-6">
             <div className="bg-nox-card p-5 rounded-xl">
-              <h3 className="text-lg font-medium text-white mb-4">Digite o número da conta</h3>
+              <h3 className="text-lg font-medium text-white mb-4">Selecione um usuário</h3>
               
-              <div className="space-y-4">
-                <Input
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  placeholder="NOX-XXXXX-XXXXX"
-                  className="bg-nox-background text-white border-zinc-700"
-                />
-                
-                <Button
-                  onClick={handleAccountSearch}
-                  className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white"
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? "Buscando..." : "Continuar"}
-                </Button>
-              </div>
-            </div>
-            
-            <div className="bg-nox-card p-5 rounded-xl">
-              <h3 className="text-lg font-medium text-white mb-4">Seu número de conta</h3>
+              <Button
+                onClick={handleGoToSearch}
+                className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white"
+              >
+                Buscar usuário
+              </Button>
               
-              <div className="bg-nox-background p-4 rounded-lg flex items-center justify-between">
-                <p className="text-white">{profile?.account_number}</p>
-                <button 
-                  className="p-2 rounded-full hover:bg-nox-card"
-                  onClick={() => profile && copyToClipboard(profile.account_number)}
-                >
-                  <Copy className="h-4 w-4 text-nox-textSecondary" />
-                </button>
-              </div>
-              
-              <p className="text-nox-textSecondary mt-3 text-sm">
-                Você pode compartilhar este número de conta para receber transferências e pagamentos.
+              <p className="text-nox-textSecondary mt-3 text-sm text-center">
+                Clique no botão acima para buscar o usuário para o qual deseja enviar um Pix
               </p>
             </div>
           </div>
@@ -250,7 +173,7 @@ const Pix = () => {
                 </div>
                 <div>
                   <p className="text-white font-medium">{selectedUser?.full_name}</p>
-                  <p className="text-nox-textSecondary text-sm">{selectedUser?.account_number}</p>
+                  <p className="text-nox-textSecondary text-sm">@{selectedUser?.username}</p>
                 </div>
               </div>
               

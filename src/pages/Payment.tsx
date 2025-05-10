@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
@@ -6,16 +6,16 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import AccountDisplay from "@/components/account-display";
-import UserSearch from "@/components/user-search";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Payment = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, refreshProfile } = useAuth();
-  const [step, setStep] = useState<"initial" | "search" | "amount" | "confirm" | "success">("initial");
+  const [step, setStep] = useState<"initial" | "amount" | "confirm" | "success">("initial");
   
   // Barcode related states
   const [barcodeValue, setBarcodeValue] = useState("");
@@ -30,6 +30,22 @@ const Payment = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Handle user selection from search page
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const selectedUserParam = searchParams.get('selectedUser');
+    
+    if (selectedUserParam) {
+      try {
+        const user = JSON.parse(decodeURIComponent(selectedUserParam));
+        setSelectedUser(user);
+        setStep("amount");
+      } catch (error) {
+        console.error("Error parsing selected user:", error);
+      }
+    }
+  }, [location]);
   
   // Handler for scanning barcode
   const handleScanBarcode = () => {
@@ -66,10 +82,9 @@ const Payment = () => {
     }, 1000);
   };
 
-  // Select a user from search results
-  const handleSelectUser = (user: any) => {
-    setSelectedUser(user);
-    setStep("amount");
+  // Navigate to user search page
+  const goToUserSearch = () => {
+    navigate("/search-users?destination=/payment");
   };
   
   // Format amount as currency
@@ -218,7 +233,7 @@ const Payment = () => {
           {/* User Payment */}
           <div 
             className="nox-card border border-zinc-800 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-zinc-900/50"
-            onClick={() => setStep("search")}
+            onClick={goToUserSearch}
           >
             <div className="flex items-center">
               <div className="h-12 w-12 rounded-full bg-nox-primary/20 flex items-center justify-center mr-3">
@@ -226,7 +241,7 @@ const Payment = () => {
               </div>
               <div>
                 <h4 className="text-white font-medium">Pagar para usuário</h4>
-                <p className="text-sm text-nox-textSecondary">Busque pelo número da conta</p>
+                <p className="text-sm text-nox-textSecondary">Busque por @username</p>
               </div>
             </div>
             <Button
@@ -321,22 +336,6 @@ const Payment = () => {
       );
     }
     
-    if (step === "search") {
-      return (
-        <div className="space-y-6">
-          <UserSearch onSelectUser={handleSelectUser} showRecent={false} />
-          
-          <Button
-            variant="ghost"
-            className="w-full text-nox-textSecondary"
-            onClick={() => setStep("initial")}
-          >
-            Voltar
-          </Button>
-        </div>
-      );
-    }
-    
     if (step === "amount") {
       return (
         <div className="space-y-6">
@@ -353,7 +352,7 @@ const Payment = () => {
               </Avatar>
               <div>
                 <p className="text-white font-medium">{selectedUser?.full_name}</p>
-                <p className="text-nox-textSecondary text-sm">{selectedUser?.account_number}</p>
+                <p className="text-nox-textSecondary text-sm">@{selectedUser?.username}</p>
               </div>
             </div>
           </div>
@@ -379,7 +378,7 @@ const Payment = () => {
             <Button 
               variant="outline"
               className="flex-1 border-zinc-700"
-              onClick={() => setStep("search")}
+              onClick={() => setStep("initial")}
             >
               Voltar
             </Button>
@@ -418,7 +417,7 @@ const Payment = () => {
               <div className="flex justify-between mt-2">
                 <p className="text-nox-textSecondary">Conta</p>
                 <p className="text-white">
-                  {selectedUser?.account_number}
+                  @{selectedUser?.username}
                 </p>
               </div>
               
@@ -496,8 +495,7 @@ const Payment = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-white">
-              {step === "search" ? "Buscar usuário" : 
-               step === "amount" ? "Valor do pagamento" : 
+              {step === "amount" ? "Valor do pagamento" : 
                step === "confirm" ? "Confirmar pagamento" : 
                step === "success" ? "Pagamento concluído" : "Pagamento"}
             </h1>
@@ -510,8 +508,7 @@ const Payment = () => {
               size="icon"
               className="text-nox-textSecondary"
               onClick={() => {
-                if (step === "search") setStep("initial");
-                if (step === "amount") setStep("search");
+                if (step === "amount") setStep("initial");
                 if (step === "confirm") setStep("amount");
               }}
             >
