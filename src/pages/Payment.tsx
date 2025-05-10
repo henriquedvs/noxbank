@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle } from "lucide-react";
+import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle, User, ArrowLeft } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import AccountDisplay from "@/components/account-display";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Payment = () => {
   const { toast } = useToast();
@@ -253,9 +254,6 @@ const Payment = () => {
             </Button>
           </div>
           
-          {/* Account Number Display */}
-          <AccountDisplay />
-          
           {/* Bill Details */}
           {billDetails && (
             <div className="nox-card border border-zinc-800">
@@ -343,7 +341,7 @@ const Payment = () => {
             <div className="flex items-center">
               <Avatar className="h-12 w-12 mr-3">
                 {selectedUser?.avatar_url ? (
-                  <img src={selectedUser.avatar_url} alt={selectedUser.full_name} />
+                  <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.full_name} />
                 ) : (
                   <AvatarFallback className="bg-nox-buttonInactive text-white">
                     {selectedUser ? getInitials(selectedUser.full_name) : 'U'}
@@ -415,7 +413,7 @@ const Payment = () => {
               </div>
               
               <div className="flex justify-between mt-2">
-                <p className="text-nox-textSecondary">Conta</p>
+                <p className="text-nox-textSecondary">Usuário</p>
                 <p className="text-white">
                   @{selectedUser?.username}
                 </p>
@@ -473,6 +471,12 @@ const Payment = () => {
                 {selectedUser?.full_name}
               </p>
             </div>
+            <div className="flex justify-between">
+              <p className="text-nox-textSecondary">Usuário</p>
+              <p className="text-white">
+                @{selectedUser?.username}
+              </p>
+            </div>
           </div>
           
           <Button 
@@ -493,13 +497,23 @@ const Payment = () => {
       {/* Header */}
       <header className="p-5">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-white">
-              {step === "amount" ? "Valor do pagamento" : 
-               step === "confirm" ? "Confirmar pagamento" : 
-               step === "success" ? "Pagamento concluído" : "Pagamento"}
-            </h1>
-            {step === "initial" && <p className="text-nox-textSecondary mt-1">Contas e boletos</p>}
+          <div className="flex items-center">
+            <Button 
+              className="p-2 rounded-full bg-nox-card mr-3"
+              variant="ghost"
+              size="icon"
+              onClick={() => step === "initial" ? navigate('/home') : setStep("initial")}
+            >
+              <ArrowLeft className="h-5 w-5 text-nox-textSecondary" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-white">
+                {step === "amount" ? "Valor do pagamento" : 
+                step === "confirm" ? "Confirmar pagamento" : 
+                step === "success" ? "Pagamento concluído" : "Pagamento"}
+              </h1>
+              {step === "initial" && <p className="text-nox-textSecondary mt-1">Contas e boletos</p>}
+            </div>
           </div>
           
           {step !== "initial" && step !== "success" && (

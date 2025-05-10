@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +37,7 @@ const UserSearchPage = () => {
       if (error) throw error;
       
       setAllUsers(profiles || []);
-      setFilteredUsers(searchTerm ? [] : profiles || []);
+      setFilteredUsers(profiles || []); // Mostrar todos os usuários por padrão
     } catch (error) {
       console.error("Error loading users:", error);
       toast({
