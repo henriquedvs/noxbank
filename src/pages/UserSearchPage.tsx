@@ -22,6 +22,11 @@ const UserSearchPage = () => {
     return params.get("destination") || "/transfer";
   });
 
+  // Fetch all users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, [user]);
+  
   // Defining loadUsers function before using it in useEffect
   const loadUsers = async () => {
     if (!user) return;
@@ -37,7 +42,7 @@ const UserSearchPage = () => {
       if (error) throw error;
       
       setAllUsers(profiles || []);
-      setFilteredUsers(profiles || []); // Mostrar todos os usuários por padrão
+      setFilteredUsers(profiles || []); // Show all users by default
     } catch (error) {
       console.error("Error loading users:", error);
       toast({
@@ -49,25 +54,17 @@ const UserSearchPage = () => {
       setIsSearching(false);
     }
   };
-
-  // Fetch all users on component mount
-  useEffect(() => {
-    loadUsers();
-  }, []);
   
-  // Handle search with debounce
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    
-    if (!value.trim()) {
+  // Handle search without debounce
+  const handleSearch = () => {
+    if (!searchTerm.trim()) {
       setFilteredUsers(allUsers);
       return;
     }
     
     // If search contains @ symbol, search by username
-    if (value.includes('@')) {
-      const usernameSearch = value.replace('@', '').toLowerCase();
+    if (searchTerm.includes('@')) {
+      const usernameSearch = searchTerm.replace('@', '').toLowerCase();
       const results = allUsers.filter(u => 
         u.username && u.username.toLowerCase().includes(usernameSearch)
       );
@@ -75,10 +72,15 @@ const UserSearchPage = () => {
     } else {
       // Otherwise search by name
       const results = allUsers.filter(u => 
-        (u.full_name && u.full_name.toLowerCase().includes(value.toLowerCase()))
+        (u.full_name && u.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
       setFilteredUsers(results);
     }
+  };
+  
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
   };
   
   // Get initials for avatar
@@ -114,15 +116,25 @@ const UserSearchPage = () => {
       </header>
       
       <div className="px-5 space-y-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-nox-textSecondary" />
-          <Input
-            className="pl-10 bg-nox-card text-white border-zinc-700"
-            placeholder="Buscar por @username ou nome"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            autoFocus
-          />
+        <div className="relative flex space-x-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-nox-textSecondary" />
+            <Input
+              className="pl-10 bg-nox-card text-white border-zinc-700"
+              placeholder="Buscar por @username ou nome"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              autoFocus
+            />
+          </div>
+          <Button 
+            onClick={handleSearch}
+            className="bg-nox-primary"
+          >
+            <Search className="h-4 w-4" />
+            Buscar
+          </Button>
         </div>
         
         {isSearching && (
