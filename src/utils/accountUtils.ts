@@ -1,4 +1,3 @@
-
 /**
  * Cleans and formats an account number by removing spaces, dashes, and other non-alphanumeric characters
  * @param accountNumber The account number to clean
@@ -80,6 +79,16 @@ export const prepareAccountSearch = (searchTerm: string): string => {
 };
 
 /**
+ * Prepares a username search query
+ * @param username The username to prepare for search (with or without @ symbol)
+ * @returns Username prepared for search
+ */
+export const prepareUsernameSearch = (username: string): string => {
+  // Remove @ symbol if present and format for ilike search
+  return `%${username.replace('@', '').toLowerCase()}%`;
+};
+
+/**
  * Fetches all registered users from the database
  * @param supabaseClient Supabase client instance
  * @param currentUserId Current user ID to exclude from results
@@ -91,7 +100,8 @@ export const fetchAllUsers = async (supabaseClient: any, currentUserId: string) 
       .from('profiles')
       .select('id, username, full_name, account_number, avatar_url')
       .neq('id', currentUserId)
-      .limit(20);
+      .order('full_name', { ascending: true })
+      .limit(50);
     
     if (error) {
       throw error;
@@ -105,7 +115,7 @@ export const fetchAllUsers = async (supabaseClient: any, currentUserId: string) 
 };
 
 /**
- * Search for users based on account number or name
+ * Search for users based on account number, username or name
  * @param supabaseClient Supabase client instance
  * @param searchTerm Search term
  * @param currentUserId Current user ID to exclude from results
@@ -117,17 +127,22 @@ export const searchUsers = async (supabaseClient: any, searchTerm: string, curre
       return [];
     }
     
-    const cleanedTerm = searchTerm.toLowerCase().trim();
-    const preparedTerm = prepareAccountSearch(cleanedTerm);
-    
-    console.log("Searching for users with term:", preparedTerm);
-    
-    const { data, error } = await supabaseClient
+    let cleanedTerm = searchTerm.toLowerCase().trim();
+    let query = supabaseClient
       .from('profiles')
       .select('id, username, full_name, account_number, avatar_url')
-      .or(`account_number.ilike.${preparedTerm},full_name.ilike.%${cleanedTerm}%`)
-      .neq('id', currentUserId)
-      .limit(10);
+      .neq('id', currentUserId);
+    
+    // If search contains @ symbol, prioritize username search
+    if (searchTerm.includes('@')) {
+      cleanedTerm = cleanedTerm.replace('@', '');
+      query = query.ilike('username', `%${cleanedTerm}%`);
+    } else {
+      // Otherwise search by name or account number
+      query = query.or(`username.ilike.%${cleanedTerm}%,full_name.ilike.%${cleanedTerm}%,account_number.ilike.%${cleanedTerm}%`);
+    }
+    
+    const { data, error } = await query.limit(20);
     
     if (error) {
       throw error;

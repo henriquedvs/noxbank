@@ -1,16 +1,14 @@
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Barcode, Camera, Search, Lock, Calendar, ArrowDown, ArrowUp, CheckCircle } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AccountDisplay from "@/components/account-display";
-import { cleanAccountNumber, prepareAccountNumberForSearch } from "@/utils/accountUtils";
+import UserSearch from "@/components/user-search";
 
 const Payment = () => {
   const { toast } = useToast();
@@ -28,11 +26,8 @@ const Payment = () => {
   } | null>(null);
   
   // User payment related states
-  const [accountNumber, setAccountNumber] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [amount, setAmount] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Handler for scanning barcode
@@ -70,75 +65,10 @@ const Payment = () => {
     }, 1000);
   };
 
-  // Search for users by account number
-  const handleSearch = async () => {
-    if (!accountNumber.trim()) {
-      toast({
-        title: "Campo vazio",
-        description: "Digite um número de conta para buscar.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsSearching(true);
-    
-    try {
-      // Clean up and prepare the account number for search
-      const cleanedAccountNumber = cleanAccountNumber(accountNumber);
-      console.log("Searching for account number:", cleanedAccountNumber);
-      
-      // Search with a broader query to improve chances of finding a match
-      // Using profiles table where account_number is stored
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, account_number, avatar_url')
-        .filter('account_number', 'ilike', prepareAccountNumberForSearch(accountNumber));
-      
-      if (error) {
-        console.error("Error searching account number:", error);
-        throw error;
-      }
-      
-      // Filter out current user from results
-      const filteredResults = data?.filter(u => u.id !== user?.id) || [];
-      
-      console.log("Search results:", filteredResults);
-      
-      if (filteredResults.length === 0) {
-        toast({
-          title: "Conta não encontrada",
-          description: "Não foi possível encontrar uma conta com este número.",
-          variant: "destructive"
-        });
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
-      }
-      
-      // Try to find exact match by comparing cleaned account numbers
-      const exactMatch = filteredResults.find(u => 
-        cleanAccountNumber(u.account_number) === cleanedAccountNumber
-      );
-      
-      if (exactMatch) {
-        console.log("Exact match found:", exactMatch);
-        setSearchResults([exactMatch]);
-      } else {
-        console.log("No exact match, using partial matches");
-        setSearchResults(filteredResults);
-      }
-      
-    } catch (error: any) {
-      console.error("Search error:", error);
-      toast({
-        title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar a conta. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSearching(false);
-    }
+  // Select a user from search results
+  const handleSelectUser = (user: any) => {
+    setSelectedUser(user);
+    setStep("amount");
   };
   
   // Format amount as currency
@@ -152,12 +82,6 @@ const Payment = () => {
     }).format(parseFloat(value) / 100 || 0);
     
     setAmount(formattedValue);
-  };
-  
-  // Select a user from search results
-  const handleSelectUser = (user: any) => {
-    setSelectedUser(user);
-    setStep("amount");
   };
   
   // Process payment
@@ -224,7 +148,7 @@ const Payment = () => {
     }
   };
   
-  // Get user initials for avatar
+  // Get initials for avatar
   const getInitials = (name: string) => {
     if (!name) return "??";
     
@@ -399,71 +323,15 @@ const Payment = () => {
     if (step === "search") {
       return (
         <div className="space-y-6">
-          <div className="space-y-4">
-            <div className="relative">
-              <div className="flex">
-                <Input
-                  className="bg-nox-card text-white border-zinc-700"
-                  placeholder="Digite o número da conta"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                />
-                <Button
-                  onClick={handleSearch}
-                  className="ml-2 bg-nox-primary"
-                  disabled={isSearching}
-                >
-                  {isSearching ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-sm text-nox-textSecondary mt-1">
-                Exemplo: NOX-12345-67890
-              </p>
-            </div>
-            
-            {searchResults.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-white font-medium">Contas encontradas</h4>
-                
-                {searchResults.map((result) => (
-                  <div 
-                    key={result.id} 
-                    className="bg-nox-card p-4 rounded-xl flex items-center justify-between cursor-pointer hover:border hover:border-nox-primary transition-all"
-                    onClick={() => handleSelectUser(result)}
-                  >
-                    <div className="flex items-center">
-                      <Avatar className="h-12 w-12 mr-3">
-                        {result.avatar_url ? (
-                          <img src={result.avatar_url} alt={result.full_name} />
-                        ) : (
-                          <AvatarFallback className="bg-nox-buttonInactive text-white">
-                            {getInitials(result.full_name)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div>
-                        <p className="text-white font-medium">{result.full_name}</p>
-                        <p className="text-nox-textSecondary text-sm">{result.account_number}</p>
-                      </div>
-                    </div>
-                    <ArrowDown className="h-5 w-5 text-nox-textSecondary" />
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <Button
-              variant="ghost"
-              className="w-full text-nox-textSecondary"
-              onClick={() => setStep("initial")}
-            >
-              Voltar
-            </Button>
-          </div>
+          <UserSearch onSelectUser={handleSelectUser} showRecent={false} />
+          
+          <Button
+            variant="ghost"
+            className="w-full text-nox-textSecondary"
+            onClick={() => setStep("initial")}
+          >
+            Voltar
+          </Button>
         </div>
       );
     }
@@ -627,7 +495,7 @@ const Payment = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-white">
-              {step === "search" ? "Buscar conta" : 
+              {step === "search" ? "Buscar usuário" : 
                step === "amount" ? "Valor do pagamento" : 
                step === "confirm" ? "Confirmar pagamento" : 
                step === "success" ? "Pagamento concluído" : "Pagamento"}
