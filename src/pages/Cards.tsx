@@ -1,4 +1,3 @@
-
 import BottomNav from "@/components/bottom-nav";
 import { useState } from "react";
 import { 
@@ -19,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CreditCard from "@/components/credit-card";
 
 const Cards = () => {
   const navigate = useNavigate();
