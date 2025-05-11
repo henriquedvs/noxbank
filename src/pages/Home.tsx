@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { BellRing, ChevronRight, Plus, ArrowUpRight, ArrowDownLeft, Calendar } from "lucide-react";
+import { BellRing, ChevronRight, Plus, ArrowUpRight, ArrowDownLeft, Calendar, CreditCard } from "lucide-react";
 import BottomNav from "@/components/bottom-nav";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
