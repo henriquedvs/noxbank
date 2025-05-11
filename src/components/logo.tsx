@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 interface LogoProps {
   className?: string;
   animated?: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
-const Logo = ({ className, animated = false }: LogoProps) => {
+const Logo = ({ className, animated = false, size = "md" }: LogoProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -19,6 +20,12 @@ const Logo = ({ className, animated = false }: LogoProps) => {
     }
   }, [animated]);
 
+  const sizeClass = {
+    sm: "h-10",
+    md: "h-16",
+    lg: "h-24"
+  };
+
   return (
     <div className={cn("flex items-center justify-center", className)}>
       <div className={cn("relative", 
@@ -27,7 +34,7 @@ const Logo = ({ className, animated = false }: LogoProps) => {
         <img 
           src="/lovable-uploads/06e568a7-047e-420a-89a8-f1b56ecda980.png"
           alt="Nox Logo"
-          className="h-12 w-auto"
+          className={cn("w-auto", sizeClass[size])}
         />
       </div>
     </div>

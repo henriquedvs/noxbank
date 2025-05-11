@@ -16,17 +16,17 @@ const BottomNav = ({ activeTab }: BottomNavProps) => {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-nox-card border-t border-zinc-800 py-2 px-4">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 py-2 px-4 shadow-md">
       <div className="flex items-center justify-around">
         {tabs.map(tab => (
           <Link
             key={tab.value}
             to={tab.path}
             className={cn(
-              "flex flex-col items-center py-1 px-3 rounded-lg transition-colors",
+              "flex flex-col items-center py-2 px-4 rounded-xl transition-colors",
               activeTab === tab.value
                 ? "text-nox-primary"
-                : "text-nox-textSecondary hover:text-white"
+                : "text-gray-400 hover:text-gray-700"
             )}
           >
             <tab.icon className="h-6 w-6 mb-1" />

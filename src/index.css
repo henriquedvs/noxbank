@@ -7,35 +7,35 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 100%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 20%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
 
-    --primary: 167 100% 37%;
+    --primary: 120 39% 49%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 20%;
 
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 69%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 167 100% 37%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 120 39% 94%;
+    --accent-foreground: 120 39% 25%;
 
     --destructive: 0 83% 66%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 167 100% 37%;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 120 39% 49%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
   }
 }
 
@@ -45,28 +45,36 @@
   }
 
   body {
-    @apply bg-nox-background text-nox-text font-inter;
+    @apply bg-white text-nox-text font-inter;
   }
 }
 
 @layer components {
   .nox-card {
-    @apply bg-nox-card rounded-xl p-5 shadow-md;
+    @apply bg-white rounded-xl p-5 shadow-md border border-gray-100;
   }
   
   .nox-input {
-    @apply bg-[#2A2A2A] border-none rounded-lg p-3 text-white focus:ring-2 focus:ring-nox-primary;
+    @apply bg-gray-50 border border-gray-200 rounded-xl p-3 text-black focus:ring-2 focus:ring-nox-primary;
   }
   
   .nox-button-primary {
-    @apply bg-nox-primary hover:bg-nox-primary/90 text-white font-medium py-3 px-5 rounded-lg transition-all;
+    @apply bg-nox-primary hover:bg-nox-primary/90 text-white font-medium py-3 px-5 rounded-xl transition-all;
   }
   
   .nox-button-secondary {
-    @apply bg-nox-buttonInactive hover:bg-nox-buttonInactive/90 text-white font-medium py-3 px-5 rounded-lg transition-all;
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-5 rounded-xl transition-all;
   }
   
   .nox-text-gradient {
-    @apply bg-gradient-to-r from-nox-primary to-emerald-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-nox-primary to-green-400 bg-clip-text text-transparent;
+  }
+
+  .nox-card-gradient {
+    @apply bg-gradient-to-b from-green-400 to-green-500 text-white rounded-xl shadow-md;
+  }
+
+  .nox-avatar-item {
+    @apply flex flex-col items-center justify-center p-4 bg-gray-100 rounded-xl min-w-[80px];
   }
 }

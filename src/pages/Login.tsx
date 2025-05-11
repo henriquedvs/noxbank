@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,24 +52,24 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-nox-background">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
       <div className="w-full max-w-md animate-fade-in">
         <div className="flex justify-center mb-8">
-          <Logo />
+          <Logo size="md" />
         </div>
         
-        <div className="nox-card mb-6">
-          <h2 className="text-2xl font-bold text-center mb-6">Entrar</h2>
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm mb-6">
+          <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Entrar</h2>
           
           {error && (
-            <div className="bg-red-900/20 border border-red-900/50 text-nox-error p-3 rounded-lg mb-4">
+            <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4">
               {error}
             </div>
           )}
           
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label htmlFor="identifier" className="block text-sm font-medium text-nox-textSecondary mb-1">
+              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1">
                 E-mail
               </label>
               <Input
@@ -84,7 +84,7 @@ const Login = () => {
             
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label htmlFor="password" className="block text-sm font-medium text-nox-textSecondary">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Senha
                 </label>
                 <Link to="/forgot-password" className="text-xs text-nox-primary hover:underline">
@@ -109,14 +109,14 @@ const Login = () => {
                 onCheckedChange={handleCheckboxChange}
                 className="data-[state=checked]:bg-nox-primary data-[state=checked]:border-nox-primary"
               />
-              <label htmlFor="rememberMe" className="ml-2 text-sm text-nox-textSecondary">
+              <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-700">
                 Manter conectado
               </label>
             </div>
             
             <Button
               type="submit"
-              className="nox-button-primary w-full"
+              className="w-full bg-nox-primary hover:bg-nox-primary/90 text-white font-medium py-6 rounded-xl"
               disabled={isLoading}
             >
               {isLoading ? "Entrando..." : "Entrar"}
@@ -124,10 +124,10 @@ const Login = () => {
           </form>
         </div>
         
-        <div className="text-center text-nox-textSecondary">
-          <p className="text-sm">
+        <div className="text-center">
+          <p className="text-gray-600">
             Não tem uma conta?{' '}
-            <Link to="/signup" className="text-nox-primary hover:underline">
+            <Link to="/signup" className="text-nox-primary font-medium hover:underline">
               Cadastre-se
             </Link>
           </p>

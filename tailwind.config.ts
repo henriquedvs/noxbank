@@ -63,15 +63,18 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// NoxBank custom colors
+				// Novo esquema de cores
 				nox: {
-					background: '#121212',
-					card: '#1E1E1E',
-					primary: '#00BFA5',
-					text: '#FFFFFF',
-					textSecondary: '#B0B0B0',
-					buttonInactive: '#333333',
+					background: '#FFFFFF',
+					card: '#FFFFFF',
+					primary: '#4CAF50',
+					text: '#333333',
+					textSecondary: '#777777',
+					buttonInactive: '#EEEEEE',
 					error: '#FF5252',
+					success: '#4CAF50',
+					warning: '#FFC107',
+					darkPanel: '#222222',
 				}
 			},
 			borderRadius: {
